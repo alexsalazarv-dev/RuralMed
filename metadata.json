@@ -1,0 +1,6 @@
+{
+  "name": "RuralMed - Plataforma de Salud Rural",
+  "description": "Plataforma médica reactiva y accesible para zonas rurales conectada a Supabase para registro y consulta segura de pacientes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
