@@ -119,30 +119,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer with Rural Trust and Ministry Information */}
-      <footer className="mt-auto border-t border-slate-200 bg-white py-6 px-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-700">RuralMed</span>
-            <span>·</span>
-            <span>Plataforma de Salud Rural para Zonas Aisladas</span>
-            <span>·</span>
-            <span className="text-emerald-700 font-semibold">PostgreSQL & Supabase</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setIsEmergencyOpen(true)}
-              className="text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
-            >
-              Línea Urgencia SAMU 131
-            </button>
-            <span>·</span>
-            <span>Atención Primaria Rural</span>
-          </div>
-        </div>
-      </footer>
-
       {/* Emergency Assistance Modal */}
       <EmergencyModal
         isOpen={isEmergencyOpen}
