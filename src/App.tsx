@@ -79,15 +79,17 @@ export default function App() {
   return (
     <div className={`min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800 ${getFontSizeClass()} transition-all duration-200`}>
       
-      {/* Accessible Header with RuralMed Branding & Text Size Toolbar */}
-      <Header
-        fontSize={fontSize}
-        setFontSize={setFontSize}
-        onOpenEmergency={() => setIsEmergencyOpen(true)}
-        currentScreen={currentScreen}
-        userName={currentUser?.nombre}
-        onLogout={handleLogout}
-      />
+      {/* Accessible Header with RuralMed Branding & Text Size Toolbar (on login/register) */}
+      {currentScreen !== 'dashboard' && (
+        <Header
+          fontSize={fontSize}
+          setFontSize={setFontSize}
+          onOpenEmergency={() => setIsEmergencyOpen(true)}
+          currentScreen={currentScreen}
+          userName={currentUser?.nombre}
+          onLogout={handleLogout}
+        />
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col justify-center">
@@ -115,6 +117,8 @@ export default function App() {
             usuario={currentUser}
             onLogout={handleLogout}
             onOpenEmergency={() => setIsEmergencyOpen(true)}
+            fontSize={fontSize}
+            setFontSize={setFontSize}
           />
         )}
       </main>
