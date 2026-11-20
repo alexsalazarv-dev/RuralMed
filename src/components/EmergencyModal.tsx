@@ -21,7 +21,7 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
       title: 'Salud Responde (MINSAL)',
       number: '600 360 7777',
       desc: 'Orientación médica telefónica por enfermeras y médicos.',
-      color: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+      color: 'bg-sky-600 hover:bg-sky-700 text-white',
       badge: 'Consulta Telefónica Gratuita',
     },
     {
@@ -97,8 +97,8 @@ export const EmergencyModal: React.FC<EmergencyModalProps> = ({ isOpen, onClose 
           ))}
         </div>
 
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-xs sm:text-sm text-emerald-900">
-          <HeartHandshake className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-xl bg-sky-50 border border-sky-200 flex items-start gap-3 text-xs sm:text-sm text-sky-900">
+          <HeartHandshake className="w-5 h-5 text-sky-700 shrink-0 mt-0.5" />
           <p>
             En caso de corte de señal en su sector, acérquese a su <strong>Posta de Salud Rural</strong> o al punto de radio vecinal más cercano.
           </p>

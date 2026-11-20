@@ -9,6 +9,7 @@ import { LoginScreen } from './components/LoginScreen.tsx';
 import { RegisterScreen } from './components/RegisterScreen.tsx';
 import { DashboardScreen } from './components/DashboardScreen.tsx';
 import { StaffDashboardScreen } from './components/StaffDashboardScreen.tsx';
+import { AdminDashboardScreen } from './components/AdminDashboardScreen.tsx';
 import { EmergencyModal } from './components/EmergencyModal.tsx';
 import { Usuario } from './lib/supabase.ts';
 import { Funcionario } from './lib/clinicData.ts';
@@ -17,16 +18,27 @@ import { Funcionario } from './lib/clinicData.ts';
 const HERO_IMAGE_URL = '/src/assets/images/rural_clinic_hero_1793967420159.jpg';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'register' | 'dashboard' | 'staff-dashboard'>('login');
+  const [currentScreen, setCurrentScreen] = useState<
+    'login' | 'register' | 'dashboard' | 'staff-dashboard' | 'admin-dashboard'
+  >('login');
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
   const [currentStaff, setCurrentStaff] = useState<Funcionario | null>(null);
+  const [currentAdmin, setCurrentAdmin] = useState<Funcionario | null>(null);
   const [fontSize, setFontSize] = useState<'normal' | 'large' | 'xl'>('normal');
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
   const [initialLoginMessage, setInitialLoginMessage] = useState<string | null>(null);
 
-  // Check if a session was previously active in sessionStorage
+  // Restore active session from sessionStorage
   useEffect(() => {
     try {
+      const savedAdmin = sessionStorage.getItem('ruralmed_admin');
+      if (savedAdmin) {
+        const parsedAdmin = JSON.parse(savedAdmin) as Funcionario;
+        setCurrentAdmin(parsedAdmin);
+        setCurrentScreen('admin-dashboard');
+        return;
+      }
+
       const savedStaff = sessionStorage.getItem('ruralmed_staff');
       if (savedStaff) {
         const parsedStaff = JSON.parse(savedStaff) as Funcionario;
@@ -49,8 +61,10 @@ export default function App() {
   const handleLoginSuccess = (usuario: Usuario) => {
     setCurrentUser(usuario);
     setCurrentStaff(null);
+    setCurrentAdmin(null);
     try {
       sessionStorage.removeItem('ruralmed_staff');
+      sessionStorage.removeItem('ruralmed_admin');
       sessionStorage.setItem('ruralmed_user', JSON.stringify(usuario));
     } catch {
       // ignore
@@ -61,13 +75,29 @@ export default function App() {
   const handleStaffLoginSuccess = (funcionario: Funcionario) => {
     setCurrentStaff(funcionario);
     setCurrentUser(null);
+    setCurrentAdmin(null);
     try {
       sessionStorage.removeItem('ruralmed_user');
+      sessionStorage.removeItem('ruralmed_admin');
       sessionStorage.setItem('ruralmed_staff', JSON.stringify(funcionario));
     } catch {
       // ignore
     }
     setCurrentScreen('staff-dashboard');
+  };
+
+  const handleAdminLoginSuccess = (admin: Funcionario) => {
+    setCurrentAdmin(admin);
+    setCurrentUser(null);
+    setCurrentStaff(null);
+    try {
+      sessionStorage.removeItem('ruralmed_user');
+      sessionStorage.removeItem('ruralmed_staff');
+      sessionStorage.setItem('ruralmed_admin', JSON.stringify(admin));
+    } catch {
+      // ignore
+    }
+    setCurrentScreen('admin-dashboard');
   };
 
   const handleRegisterSuccess = (usuario: Usuario) => {
@@ -81,16 +111,17 @@ export default function App() {
     try {
       sessionStorage.removeItem('ruralmed_user');
       sessionStorage.removeItem('ruralmed_staff');
+      sessionStorage.removeItem('ruralmed_admin');
     } catch {
       // ignore
     }
     setCurrentUser(null);
     setCurrentStaff(null);
+    setCurrentAdmin(null);
     setInitialLoginMessage(null);
     setCurrentScreen('login');
   };
 
-  // Font size multiplier class
   const getFontSizeClass = () => {
     switch (fontSize) {
       case 'large':
@@ -102,10 +133,12 @@ export default function App() {
     }
   };
 
+  const showPublicHeader =
+    currentScreen === 'login' || currentScreen === 'register';
+
   return (
     <div className={`min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800 ${getFontSizeClass()} transition-all duration-200`}>
-      {/* Accessible Header with RuralMed Branding & Text Size Toolbar (on login/register) */}
-      {currentScreen !== 'dashboard' && currentScreen !== 'staff-dashboard' && (
+      {showPublicHeader && (
         <Header
           fontSize={fontSize}
           setFontSize={setFontSize}
@@ -116,12 +149,12 @@ export default function App() {
         />
       )}
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col justify-center">
         {currentScreen === 'login' && (
           <LoginScreen
             onLoginSuccess={handleLoginSuccess}
             onStaffLoginSuccess={handleStaffLoginSuccess}
+            onAdminLoginSuccess={handleAdminLoginSuccess}
             onGoToRegister={() => {
               setInitialLoginMessage(null);
               setCurrentScreen('register');
@@ -154,9 +187,15 @@ export default function App() {
             onLogout={handleLogout}
           />
         )}
+
+        {currentScreen === 'admin-dashboard' && currentAdmin && (
+          <AdminDashboardScreen
+            admin={currentAdmin}
+            onLogout={handleLogout}
+          />
+        )}
       </main>
 
-      {/* Emergency Assistance Modal */}
       <EmergencyModal
         isOpen={isEmergencyOpen}
         onClose={() => setIsEmergencyOpen(false)}

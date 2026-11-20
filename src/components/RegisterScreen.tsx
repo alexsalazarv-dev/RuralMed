@@ -169,7 +169,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
           onClick={onBackToLogin}
           className="min-h-[44px] inline-flex items-center gap-2 px-4 py-2 rounded-xl text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 font-semibold text-sm transition-colors shadow-xs"
         >
-          <ArrowLeft className="w-4 h-4 text-emerald-700" />
+          <ArrowLeft className="w-4 h-4 text-sky-700" />
           <span>Volver al Inicio / Iniciar Sesión</span>
         </button>
       </div>
@@ -177,19 +177,19 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
         
         {/* Header Section */}
-        <div className="bg-gradient-to-r from-emerald-800 to-teal-800 text-white p-6 sm:p-8">
+        <div className="bg-gradient-to-r from-sky-800 to-cyan-800 text-white p-6 sm:p-8">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2.5 rounded-xl bg-emerald-700/60 text-emerald-200">
+            <div className="p-2.5 rounded-xl bg-sky-700/60 text-sky-200">
               <HeartPulse className="w-6 h-6" />
             </div>
-            <span className="text-xs font-bold tracking-wider uppercase text-emerald-200">
+            <span className="text-xs font-bold tracking-wider uppercase text-sky-200">
               Ficha Clínica Rural
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             Registro de Nuevo Usuario
           </h1>
-          <p className="mt-1 text-sm sm:text-base text-emerald-100 max-w-2xl">
+          <p className="mt-1 text-sm sm:text-base text-sky-100 max-w-2xl">
             Inscripción para atenciones médicas, rondas rurales, botiquín y entrega de medicamentos a domicilio.
           </p>
         </div>
@@ -197,7 +197,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
         {/* Modal / Banner de Éxito al Completar el Registro */}
         {successData ? (
           <div className="p-8 sm:p-12 text-center animate-in zoom-in-95 duration-200">
-            <div className="w-20 h-20 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+            <div className="w-20 h-20 bg-sky-100 text-sky-700 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
               <CheckCircle2 className="w-12 h-12 stroke-[2.2]" />
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
@@ -207,14 +207,14 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
               Bienvenido/a <strong>{successData.nombre} {successData.apellidos}</strong>. Su ficha en RuralMed ha sido creada y guardada en nuestra base de datos.
             </p>
 
-            <div className="mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl max-w-md mx-auto text-left text-sm text-emerald-900 space-y-2">
+            <div className="mt-6 p-4 bg-sky-50 border border-sky-200 rounded-2xl max-w-md mx-auto text-left text-sm text-sky-900 space-y-2">
               <p className="font-bold flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-700" />
+                <ShieldCheck className="w-5 h-5 text-sky-700" />
                 Datos de Acceso Guardados:
               </p>
               <p>• <strong>RUT:</strong> {successData.rut}</p>
               <p>• <strong>Celular (Clave):</strong> {successData.celular}</p>
-              <p className="text-xs text-emerald-700 pt-1">
+              <p className="text-xs text-sky-700 pt-1">
                 Redirigiendo a la pantalla de Inicio en unos segundos...
               </p>
             </div>
@@ -223,7 +223,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
               <button
                 type="button"
                 onClick={() => onRegisterSuccess(successData)}
-                className="min-h-[50px] px-8 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-700/20 active:scale-95 transition-all cursor-pointer"
+                className="min-h-[50px] px-8 py-3 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-base shadow-lg shadow-sky-700/20 active:scale-95 transition-all cursor-pointer"
               >
                 Ir a Iniciar Sesión Ahora
               </button>
@@ -248,7 +248,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
               {/* Bloque 1: Identificación Personal */}
               <div>
                 <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2 mb-4 flex items-center gap-2">
-                  <User className="w-5 h-5 text-emerald-700" />
+                  <User className="w-5 h-5 text-sky-700" />
                   <span>1. Identificación del Paciente</span>
                 </h2>
 
@@ -271,7 +271,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                         onChange={handleRutChange}
                         placeholder="Ej: 12.345.678-9"
                         maxLength={12}
-                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                       />
                     </div>
                     <span className="text-xs text-slate-500 mt-1 block">Con o sin puntos, con guión y dígito verificador.</span>
@@ -295,7 +295,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                         min="1910-01-01"
                         value={formData.fecha_nacimiento}
                         onChange={handleChange}
-                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors bg-white"
+                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors bg-white"
                       />
                     </div>
                     <span className="text-xs text-slate-500 mt-1 block">Día / Mes / Año</span>
@@ -318,7 +318,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                         value={formData.nombre}
                         onChange={handleChange}
                         placeholder="Ej: Rosa María"
-                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                       />
                     </div>
                   </div>
@@ -340,7 +340,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                         value={formData.apellidos}
                         onChange={handleChange}
                         placeholder="Ej: Espinoza Silva"
-                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                       />
                     </div>
                   </div>
@@ -350,7 +350,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
               {/* Bloque 2: Contacto y Clave de Acceso */}
               <div>
                 <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2 mb-4 flex items-center gap-2">
-                  <Phone className="w-5 h-5 text-emerald-700" />
+                  <Phone className="w-5 h-5 text-sky-700" />
                   <span>2. Contacto y Acceso al Sistema</span>
                 </h2>
 
@@ -361,7 +361,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                       <label htmlFor="celular" className="block text-sm font-bold text-slate-900">
                         Celular <span className="text-rose-600">*</span>
                       </label>
-                      <span className="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
+                      <span className="text-xs font-semibold text-sky-800 bg-sky-100 px-2 py-0.5 rounded">
                         Será su contraseña
                       </span>
                     </div>
@@ -377,7 +377,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                         value={formData.celular}
                         onChange={handleChange}
                         placeholder="Ej: +56 9 8765 4321 o 987654321"
-                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                       />
                     </div>
                     <span className="text-xs text-slate-500 mt-1 block">
@@ -402,7 +402,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                         value={formData.email}
                         onChange={handleChange}
                         placeholder="Ej: rosa.espinoza@gmail.com"
-                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                       />
                     </div>
                     <span className="text-xs text-slate-500 mt-1 block">
@@ -415,7 +415,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
               {/* Bloque 3: Ubicación Rural */}
               <div>
                 <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2 mb-4 flex items-center gap-2">
-                  <Home className="w-5 h-5 text-emerald-700" />
+                  <Home className="w-5 h-5 text-sky-700" />
                   <span>3. Domicilio y Localidad Rural</span>
                 </h2>
 
@@ -437,7 +437,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                         value={formData.direccion}
                         onChange={handleChange}
                         placeholder="Ej: Camino Real Parcela 22, Sector Los Aromos"
-                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                       />
                     </div>
                     <span className="text-xs text-slate-500 mt-1 block">
@@ -463,7 +463,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                         value={formData.ciudad}
                         onChange={handleChange}
                         placeholder="Ej: Curacaví, Villarrica, Castro, etc."
-                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                        className="w-full min-h-[48px] pl-11 pr-4 rounded-xl border border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                       />
                       <datalist id="ciudades-sugerencias">
                         {commonCities.map((c) => (
@@ -483,7 +483,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full min-h-[54px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base sm:text-lg shadow-lg shadow-emerald-700/20 active:scale-[0.99] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-full min-h-[54px] rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-base sm:text-lg shadow-lg shadow-sky-700/20 active:scale-[0.99] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {loading ? (
                     <>
@@ -504,7 +504,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({
                 <button
                   type="button"
                   onClick={onBackToLogin}
-                  className="text-sm font-semibold text-slate-600 hover:text-emerald-700 transition-colors py-2"
+                  className="text-sm font-semibold text-slate-600 hover:text-sky-700 transition-colors py-2"
                 >
                   ¿Ya tiene una cuenta creada? <u>Haga clic aquí para Iniciar Sesión</u>
                 </button>

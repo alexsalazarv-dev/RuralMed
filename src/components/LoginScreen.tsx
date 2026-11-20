@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { supabase, formatRUT, Usuario } from '../lib/supabase.ts';
 import { Funcionario, FUNCIONARIOS_PRUEBA } from '../lib/clinicData.ts';
+import { fetchFuncionarios } from '../lib/adminService.ts';
+import { RURALMED_LOGO_URL } from './Header.tsx';
 import {
   LogIn,
   UserPlus,
@@ -10,7 +12,6 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
-  HeartPulse,
   Stethoscope,
   User,
   Lock,
@@ -20,6 +21,7 @@ import {
 interface LoginScreenProps {
   onLoginSuccess: (usuario: Usuario) => void;
   onStaffLoginSuccess: (funcionario: Funcionario) => void;
+  onAdminLoginSuccess: (admin: Funcionario) => void;
   onGoToRegister: () => void;
   initialMessage?: string | null;
   heroImage?: string;
@@ -28,17 +30,18 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onLoginSuccess,
   onStaffLoginSuccess,
+  onAdminLoginSuccess,
   onGoToRegister,
   initialMessage,
 }) => {
-  const [loginRole, setLoginRole] = useState<'paciente' | 'funcionario'>('paciente');
+  const [loginRole, setLoginRole] = useState<'paciente' | 'funcionario' | 'administrativo'>('paciente');
 
   // Patient login states
   const [rut, setRut] = useState('');
   const [celular, setCelular] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Staff login states
+  // Staff / Admin login states
   const [staffIdentifier, setStaffIdentifier] = useState('');
   const [staffPassword, setStaffPassword] = useState('');
   const [showStaffPassword, setShowStaffPassword] = useState(false);
@@ -46,9 +49,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleRoleChange = (role: 'paciente' | 'funcionario') => {
+  const handleRoleChange = (role: 'paciente' | 'funcionario' | 'administrativo') => {
     setLoginRole(role);
     setErrorMessage(null);
+    setStaffIdentifier('');
+    setStaffPassword('');
   };
 
   // Handle RUT input formatting for patient
@@ -120,7 +125,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
   };
 
-  const handleStaffSubmit = async (e: React.FormEvent) => {
+  const handleInstitutionalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const idTrimmed = staffIdentifier.trim();
     const passTrimmed = staffPassword.trim();
@@ -137,51 +142,57 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       const normalizedInput = idTrimmed.toLowerCase();
       const normalizedRutInput = idTrimmed.replace(/\./g, '').toUpperCase();
 
-      // 1. Check Supabase `funcionarios` table if populated
-      try {
-        const { data: dbStaff } = await supabase.from('funcionarios').select('*');
-        if (dbStaff && dbStaff.length > 0) {
-          const matchDb = dbStaff.find((f: Record<string, unknown>) => {
-            const dbEmail = String(f.email || '').toLowerCase();
-            const dbRut = String(f.rut || '').replace(/\./g, '').toUpperCase();
-            const dbPass = String(f.password || f.contrasena || '');
-            return (
-              (dbEmail === normalizedInput || dbRut === normalizedRutInput) &&
-              dbPass === passTrimmed
-            );
-          });
-          if (matchDb) {
-            onStaffLoginSuccess({
-              id: String(matchDb.id || matchDb.funcionario_id || 'func-db'),
-              rut: String(matchDb.rut || ''),
-              email: String(matchDb.email || ''),
-              password: '',
-              nombre: String(matchDb.nombre || 'Funcionario de Salud'),
-              cargo: String(matchDb.cargo || 'Equipo de Salud Rural'),
-              rol: matchDb.rol === 'admin' ? 'admin' : 'doctor',
-              profesionalId: matchDb.profesional_id ? String(matchDb.profesional_id) : undefined,
-              posta: String(matchDb.posta || 'Posta de Salud Rural'),
-            });
-            return;
-          }
-        }
-      } catch {
-        // Fallback to built-in verified institutional accounts
-      }
-
-      // 2. Check institutional staff accounts
-      const matched = FUNCIONARIOS_PRUEBA.find((f) => {
+      // 1. Check Supabase + Admin-managed funcionarios
+      const allStaff = await fetchFuncionarios();
+      const matchedManaged = allStaff.find((f) => {
         const emailMatch = f.email.toLowerCase() === normalizedInput;
         const rutMatch = f.rut.replace(/\./g, '').toUpperCase() === normalizedRutInput;
         return (emailMatch || rutMatch) && f.password === passTrimmed;
       });
 
-      if (matched) {
-        onStaffLoginSuccess(matched);
+      let resolvedUser: Funcionario | null = null;
+
+      if (matchedManaged) {
+        resolvedUser = {
+          id: matchedManaged.id,
+          rut: matchedManaged.rut,
+          email: matchedManaged.email,
+          password: '',
+          nombre: matchedManaged.nombre,
+          cargo:
+            matchedManaged.rol === 'Administrativo'
+              ? 'Administrativo de Posta Rural'
+              : matchedManaged.especialidad,
+          rol: matchedManaged.rol === 'Administrativo' ? 'admin' : 'doctor',
+          profesionalId: matchedManaged.profesionalId,
+          posta: 'Posta de Salud Rural',
+        };
       } else {
+        const matchedSeed = FUNCIONARIOS_PRUEBA.find((f) => {
+          const emailMatch = f.email.toLowerCase() === normalizedInput;
+          const rutMatch = f.rut.replace(/\./g, '').toUpperCase() === normalizedRutInput;
+          return (emailMatch || rutMatch) && f.password === passTrimmed;
+        });
+        if (matchedSeed) resolvedUser = matchedSeed;
+      }
+
+      if (!resolvedUser) {
         setErrorMessage(
-          'Credenciales institucionales incorrectas. Verifique su RUT/correo y contraseña o utilice una cuenta de prueba.'
+          'Credenciales institucionales incorrectas. Verifique su RUT/correo y contraseña o utilice la cuenta de prueba.'
         );
+        return;
+      }
+
+      if (loginRole === 'administrativo') {
+        if (resolvedUser.rol !== 'admin') {
+          setErrorMessage(
+            'Esta cuenta corresponde a un profesional de salud. Para el Panel Administrativo ingrese con un usuario de rol Administrativo.'
+          );
+          return;
+        }
+        onAdminLoginSuccess(resolvedUser);
+      } else {
+        onStaffLoginSuccess(resolvedUser);
       }
     } finally {
       setLoading(false);
@@ -194,25 +205,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setErrorMessage(null);
   };
 
+  const doctorTestAccounts = FUNCIONARIOS_PRUEBA.filter((f) => f.rol === 'doctor');
+  const adminTestAccounts = FUNCIONARIOS_PRUEBA.filter((f) => f.rol === 'admin');
+
   return (
     <div className="w-full max-w-lg mx-auto py-8 sm:py-12 px-4 sm:px-6 flex flex-col items-center justify-center">
-      {/* Central Logo & RuralMed Title */}
-      <div className="text-center mb-7 flex flex-col items-center">
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-xl shadow-emerald-700/25 ring-8 ring-emerald-50 mb-4 transition-transform hover:scale-105 duration-200">
-          <HeartPulse className="w-11 h-11 stroke-[2.2]" />
-        </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight">
-          Rural<span className="text-emerald-600">Med</span>
-        </h1>
-        <p className="mt-1.5 text-sm sm:text-base text-slate-600 font-medium">
-          Plataforma de Salud para Zonas Rurales
-        </p>
+      {/* Central Official RuralMed Logo */}
+      <div className="text-center mb-6 flex flex-col items-center">
+        <img
+          src={RURALMED_LOGO_URL}
+          alt="RuralMed"
+          className="w-[150px] h-auto object-contain rounded-2xl mix-blend-multiply"
+        />
       </div>
 
       {/* Informational Notification if redirected after registration */}
       {initialMessage && loginRole === 'paciente' && (
-        <div className="w-full mb-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex items-center gap-3 shadow-xs animate-in fade-in">
-          <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
+        <div className="w-full mb-5 p-4 rounded-2xl bg-sky-50 border border-sky-300 text-sky-900 flex items-center gap-3 shadow-xs animate-in fade-in">
+          <ShieldCheck className="w-6 h-6 text-sky-600 shrink-0" />
           <div>
             <p className="font-bold text-sm">¡Registro guardado con éxito!</p>
             <p className="text-xs sm:text-sm mt-0.5">{initialMessage}</p>
@@ -221,33 +231,46 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       )}
 
       {/* Main Clean Form Card */}
-      <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 p-6 sm:p-8">
-        {/* Dual Access Tabs: Soy Paciente / Soy Funcionario */}
-        <div className="grid grid-cols-2 gap-1.5 p-1.5 bg-slate-100 rounded-2xl mb-6 border border-slate-200/70">
+      <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 p-5 sm:p-8">
+        {/* 3 Access Tabs: Paciente / Funcionario / Administrativo */}
+        <div className="grid grid-cols-3 gap-1 p-1.5 bg-slate-100 rounded-2xl mb-6 border border-slate-200/70">
           <button
             type="button"
             onClick={() => handleRoleChange('paciente')}
-            className={`min-h-[46px] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`min-h-[46px] px-2 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
               loginRole === 'paciente'
-                ? 'bg-emerald-600 text-white shadow-sm'
+                ? 'bg-sky-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <User className="w-4 h-4 shrink-0" />
-            <span>Soy Paciente</span>
+            <span>Paciente</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleRoleChange('funcionario')}
-            className={`min-h-[46px] rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            className={`min-h-[46px] px-2 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
               loginRole === 'funcionario'
-                ? 'bg-emerald-600 text-white shadow-sm'
+                ? 'bg-sky-600 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Stethoscope className="w-4 h-4 shrink-0" />
-            <span>Soy Funcionario</span>
+            <span>Funcionario</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleRoleChange('administrativo')}
+            className={`min-h-[46px] px-2 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              loginRole === 'administrativo'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 shrink-0" />
+            <span>Admin</span>
           </button>
         </div>
 
@@ -262,10 +285,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
         )}
 
-        {/* TAB 1: SOY PACIENTE */}
+        {/* TAB 1: PACIENTE */}
         {loginRole === 'paciente' && (
           <form onSubmit={handlePatientSubmit} className="space-y-5">
-            {/* Campo 1: RUT */}
             <div>
               <label htmlFor="rut" className="block text-sm sm:text-base font-bold text-slate-900 mb-1.5">
                 RUT <span className="text-rose-600">*</span>
@@ -282,7 +304,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   onChange={handleRutChange}
                   placeholder="Ej: 12.345.678-9"
                   maxLength={12}
-                  className="w-full min-h-[52px] pl-11 pr-4 rounded-xl border-2 border-slate-300 text-slate-900 text-base sm:text-lg font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                  className="w-full min-h-[52px] pl-11 pr-4 rounded-xl border-2 border-slate-300 text-slate-900 text-base sm:text-lg font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                   autoComplete="username"
                 />
               </div>
@@ -291,13 +313,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </p>
             </div>
 
-            {/* Campo 2: Número de Celular */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="celular" className="block text-sm sm:text-base font-bold text-slate-900">
                   Número de Celular <span className="text-rose-600">*</span>
                 </label>
-                <span className="text-xs font-semibold text-emerald-700">
+                <span className="text-xs font-semibold text-sky-700">
                   Contraseña de acceso
                 </span>
               </div>
@@ -312,7 +333,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   value={celular}
                   onChange={handleCelularChange}
                   placeholder="Ej: +56 9 8765 4321 o 987654321"
-                  className="w-full min-h-[52px] pl-11 pr-12 rounded-xl border-2 border-slate-300 text-slate-900 text-base sm:text-lg font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                  className="w-full min-h-[52px] pl-11 pr-12 rounded-xl border-2 border-slate-300 text-slate-900 text-base sm:text-lg font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                   autoComplete="current-password"
                 />
                 <button
@@ -329,12 +350,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </p>
             </div>
 
-            {/* Botón Principal: Ingresar */}
             <div className="pt-1">
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full min-h-[54px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base sm:text-lg shadow-lg shadow-emerald-700/20 active:scale-[0.99] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full min-h-[54px] rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-base sm:text-lg shadow-lg shadow-sky-700/20 active:scale-[0.99] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
               >
                 {loading ? (
                   <>
@@ -350,7 +370,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </button>
             </div>
 
-            {/* Separador */}
             <div className="relative my-2">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200" />
@@ -360,23 +379,35 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </div>
             </div>
 
-            {/* Botón Secundario: Registrar / Nuevo Usuario */}
             <div>
               <button
                 type="button"
                 onClick={onGoToRegister}
-                className="w-full min-h-[52px] rounded-2xl bg-teal-50 hover:bg-teal-100 border-2 border-teal-300 text-teal-800 font-bold text-base shadow-xs active:scale-[0.99] transition-all flex items-center justify-center gap-3 cursor-pointer"
+                className="w-full min-h-[52px] rounded-2xl bg-cyan-50 hover:bg-cyan-100 border-2 border-cyan-300 text-cyan-800 font-bold text-base shadow-xs active:scale-[0.99] transition-all flex items-center justify-center gap-3 cursor-pointer"
               >
-                <UserPlus className="w-5 h-5 stroke-[2.2] text-teal-700" />
+                <UserPlus className="w-5 h-5 stroke-[2.2] text-cyan-700" />
                 <span>Registrar / Nuevo Usuario</span>
               </button>
             </div>
           </form>
         )}
 
-        {/* TAB 2: SOY FUNCIONARIO */}
-        {loginRole === 'funcionario' && (
-          <form onSubmit={handleStaffSubmit} className="space-y-5">
+        {/* TAB 2 & 3: FUNCIONARIO / PANEL ADMINISTRATIVO */}
+        {(loginRole === 'funcionario' || loginRole === 'administrativo') && (
+          <form onSubmit={handleInstitutionalSubmit} className="space-y-5">
+            <div className="pb-1">
+              <h2 className="text-lg font-extrabold text-slate-900">
+                {loginRole === 'administrativo'
+                  ? 'Acceso Panel Administrativo'
+                  : 'Acceso Equipo de Salud'}
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {loginRole === 'administrativo'
+                  ? 'Gestión de doctores, funcionarios y pacientes registrados.'
+                  : 'Agenda de citas médicas y reportes de atención.'}
+              </p>
+            </div>
+
             <div>
               <label htmlFor="staff-id" className="block text-sm sm:text-base font-bold text-slate-900 mb-1.5">
                 RUT o Correo Institucional <span className="text-rose-600">*</span>
@@ -394,8 +425,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     setStaffIdentifier(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
-                  placeholder="Ej: alejandro.morales@ruralmed.cl o 14.520.890-3"
-                  className="w-full min-h-[52px] pl-11 pr-4 rounded-xl border-2 border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                  placeholder={
+                    loginRole === 'administrativo'
+                      ? 'Ej: admin@ruralmed.cl o 16.890.432-1'
+                      : 'Ej: alejandro.morales@ruralmed.cl o 14.520.890-3'
+                  }
+                  className="w-full min-h-[52px] pl-11 pr-4 rounded-xl border-2 border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                   autoComplete="username"
                 />
               </div>
@@ -403,7 +438,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
             <div>
               <label htmlFor="staff-password" className="block text-sm sm:text-base font-bold text-slate-900 mb-1.5">
-                Contraseña Institucional <span className="text-rose-600">*</span>
+                Contraseña <span className="text-rose-600">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -419,7 +454,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     if (errorMessage) setErrorMessage(null);
                   }}
                   placeholder="Ingrese su contraseña"
-                  className="w-full min-h-[52px] pl-11 pr-12 rounded-xl border-2 border-slate-300 text-slate-900 text-base font-medium focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 transition-colors placeholder:text-slate-400 bg-white"
+                  className="w-full min-h-[52px] pl-11 pr-12 rounded-xl border-2 border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                   autoComplete="current-password"
                 />
                 <button
@@ -437,32 +472,41 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full min-h-[54px] rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-base sm:text-lg shadow-lg shadow-emerald-800/20 active:scale-[0.99] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+                className="w-full min-h-[54px] rounded-2xl bg-sky-700 hover:bg-sky-800 text-white font-bold text-base sm:text-lg shadow-lg shadow-sky-800/20 active:scale-[0.99] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
               >
-                <Stethoscope className="w-5 h-5 stroke-[2.3]" />
-                <span>Ingresar al Panel de Salud</span>
+                {loginRole === 'administrativo' ? (
+                  <>
+                    <ShieldCheck className="w-5 h-5 stroke-[2.3]" />
+                    <span>Ingresar al Panel Administrativo</span>
+                  </>
+                ) : (
+                  <>
+                    <Stethoscope className="w-5 h-5 stroke-[2.3]" />
+                    <span>Ingresar al Panel de Salud</span>
+                  </>
+                )}
               </button>
             </div>
 
-            {/* Test Credentials Helper */}
+            {/* Test Credentials Helper scoped to selected tab */}
             <div className="mt-4 pt-4 border-t border-slate-200">
               <p className="text-xs font-bold text-slate-600 mb-2.5">
-                Cuentas de acceso rápido para pruebas:
+                Cuenta de acceso rápido para pruebas:
               </p>
               <div className="space-y-2">
-                {FUNCIONARIOS_PRUEBA.map((acc) => (
+                {(loginRole === 'administrativo' ? adminTestAccounts : doctorTestAccounts).map((acc) => (
                   <button
                     key={acc.id}
                     type="button"
                     onClick={() => applyTestAccount(acc)}
-                    className="w-full text-left p-3 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/80 transition-colors cursor-pointer"
+                    className="w-full text-left p-3 rounded-xl bg-sky-50/70 hover:bg-sky-100/70 border border-sky-200/80 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs sm:text-sm font-bold text-emerald-950">
+                      <span className="text-xs sm:text-sm font-bold text-sky-950">
                         {acc.nombre}
                       </span>
-                      <span className="text-[11px] font-semibold text-emerald-700">
-                        {acc.rol === 'admin' ? 'Administración' : 'Médico'}
+                      <span className="text-[11px] font-semibold text-sky-700">
+                        {acc.rol === 'admin' ? 'Administrativo' : 'Médico'}
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-600 mt-0.5 font-mono">

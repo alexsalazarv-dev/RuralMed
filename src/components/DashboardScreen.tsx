@@ -18,8 +18,8 @@ import {
   formatFechaHumana,
 } from '../lib/appointmentsService.ts';
 import { AvailabilityCalendar } from './AvailabilityCalendar.tsx';
+import { RURALMED_LOGO_URL } from './Header.tsx';
 import {
-  HeartPulse,
   Calendar,
   ClipboardList,
   Users,
@@ -70,11 +70,11 @@ interface Derivacion {
 function getEstadoBadgeStyle(estado: EstadoCita): string {
   switch (estado) {
     case 'Confirmada':
-      return 'bg-emerald-100 text-emerald-900 border border-emerald-200';
+      return 'bg-sky-100 text-sky-900 border border-sky-200';
     case 'En Espera':
       return 'bg-amber-100 text-amber-900 border border-amber-200';
     case 'Atendida':
-      return 'bg-teal-100 text-teal-900 border border-teal-200';
+      return 'bg-cyan-100 text-cyan-900 border border-cyan-200';
     case 'Cancelada':
       return 'bg-rose-100 text-rose-800 border border-rose-200';
   }
@@ -344,22 +344,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   return (
     <div className="w-full max-w-xl mx-auto px-4 py-4 sm:py-6 flex flex-col min-h-screen">
       {/* 1. Encabezado de Bienvenida */}
-      <header className="flex items-center justify-between pb-4 pt-1 border-b border-slate-100">
+      <header className="flex items-center justify-between pb-4 pt-1 border-b border-sky-100">
         <div
           onClick={() => setActiveView('home')}
           className="flex items-center gap-2.5 cursor-pointer select-none"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-md shadow-emerald-700/20">
-            <HeartPulse className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <div>
-            <span className="text-xl font-bold tracking-tight text-slate-900 block leading-tight">
-              Rural<span className="text-emerald-600">Med</span>
-            </span>
-            <span className="text-xs font-medium text-slate-500 block">
-              Su salud, cerca
-            </span>
-          </div>
+          <img
+            src={RURALMED_LOGO_URL}
+            alt="RuralMed"
+            className="h-[40px] w-auto object-contain rounded-lg"
+          />
+          <span className="text-xs font-medium text-slate-500 border-l border-slate-200 pl-2.5">
+            Su salud, cerca
+          </span>
         </div>
 
         {/* Icono de Perfil de Usuario a la derecha */}
@@ -368,7 +365,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             type="button"
             onClick={() => setShowProfileModal(true)}
             aria-label="Ver perfil de usuario"
-            className="w-11 h-11 rounded-full bg-emerald-50 border-2 border-emerald-200 text-emerald-800 flex items-center justify-center shadow-xs hover:bg-emerald-100 active:scale-95 transition-all cursor-pointer relative"
+            className="w-11 h-11 rounded-full bg-sky-50 border-2 border-sky-200 text-sky-800 flex items-center justify-center shadow-xs hover:bg-sky-100 active:scale-95 transition-all cursor-pointer relative"
           >
             <UserIcon className="w-5 h-5 stroke-[2.2]" />
             <span className="sr-only">Perfil de {usuario.nombre}</span>
@@ -396,9 +393,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <button
                 type="button"
                 onClick={() => openReservarView()}
-                className="group p-5 sm:p-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-emerald-300 active:scale-95 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[145px] sm:min-h-[165px]"
+                className="group p-5 sm:p-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-sky-300 active:scale-95 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[145px] sm:min-h-[165px]"
               >
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors shadow-inner">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-sky-600 group-hover:text-white transition-colors shadow-inner">
                   <Calendar className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.2]" />
                 </div>
                 <span className="text-sm sm:text-base font-extrabold text-slate-800 tracking-tight leading-snug">
@@ -413,9 +410,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   setAllCitas(loadAllCitas());
                   setActiveView('mis-citas');
                 }}
-                className="group p-5 sm:p-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-emerald-300 active:scale-95 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[145px] sm:min-h-[165px]"
+                className="group p-5 sm:p-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-sky-300 active:scale-95 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[145px] sm:min-h-[165px]"
               >
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-teal-600 group-hover:text-white transition-colors shadow-inner">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cyan-50 text-cyan-700 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-cyan-600 group-hover:text-white transition-colors shadow-inner">
                   <ClipboardList className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.2]" />
                 </div>
                 <span className="text-sm sm:text-base font-extrabold text-slate-800 tracking-tight leading-snug">
@@ -427,9 +424,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveView('cargas')}
-                className="group p-5 sm:p-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-emerald-300 active:scale-95 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[145px] sm:min-h-[165px]"
+                className="group p-5 sm:p-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-sky-300 active:scale-95 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[145px] sm:min-h-[165px]"
               >
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors shadow-inner">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-sky-600 group-hover:text-white transition-colors shadow-inner">
                   <Users className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.2]" />
                 </div>
                 <span className="text-sm sm:text-base font-extrabold text-slate-800 tracking-tight leading-snug">
@@ -441,9 +438,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveView('derivaciones')}
-                className="group p-5 sm:p-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-emerald-300 active:scale-95 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[145px] sm:min-h-[165px]"
+                className="group p-5 sm:p-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-sky-300 active:scale-95 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[145px] sm:min-h-[165px]"
               >
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-teal-600 group-hover:text-white transition-colors shadow-inner">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cyan-50 text-cyan-700 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-cyan-600 group-hover:text-white transition-colors shadow-inner">
                   <FileSignature className="w-7 h-7 sm:w-8 sm:h-8 stroke-[2.2]" />
                 </div>
                 <span className="text-sm sm:text-base font-extrabold text-slate-800 tracking-tight leading-snug">
@@ -486,7 +483,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
             {bookingSuccess ? (
               <div className="py-8 text-center animate-in zoom-in-95">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3">
+                <div className="w-16 h-16 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center mx-auto mb-3">
                   <CheckCircle2 className="w-10 h-10" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900">¡Hora Reservada con Éxito!</h3>
@@ -494,7 +491,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   Cita confirmada con <strong>{bookingSuccess.profesionalNombre}</strong> para el{' '}
                   <strong>{bookingSuccess.fecha}</strong> a las <strong>{bookingSuccess.hora} hrs</strong>.
                 </p>
-                <p className="text-xs text-emerald-700 font-semibold mt-2">
+                <p className="text-xs text-sky-700 font-semibold mt-2">
                   Redirigiendo a Mis Citas Médicas...
                 </p>
               </div>
@@ -515,7 +512,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   <select
                     value={bookingPara}
                     onChange={(e) => setBookingPara(e.target.value)}
-                    className="w-full min-h-[48px] px-3.5 rounded-xl border-2 border-slate-200 text-slate-900 font-semibold focus:border-emerald-600 bg-white"
+                    className="w-full min-h-[48px] px-3.5 rounded-xl border-2 border-slate-200 text-slate-900 font-semibold focus:border-sky-600 bg-white"
                   >
                     <option value="titular">
                       {usuario.nombre} {usuario.apellidos} (Titular)
@@ -536,7 +533,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   <select
                     value={bookingEspecialidad}
                     onChange={(e) => handleEspecialidadChange(e.target.value)}
-                    className="w-full min-h-[48px] px-3.5 rounded-xl border-2 border-slate-200 text-slate-900 font-semibold focus:border-emerald-600 bg-white"
+                    className="w-full min-h-[48px] px-3.5 rounded-xl border-2 border-slate-200 text-slate-900 font-semibold focus:border-sky-600 bg-white"
                   >
                     {TIPOS_ATENCION.map((tipo) => (
                       <option key={tipo} value={tipo}>
@@ -554,7 +551,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   <select
                     value={selectedProfesional?.id || ''}
                     onChange={(e) => handleProfesionalChange(e.target.value)}
-                    className="w-full min-h-[48px] px-3.5 rounded-xl border-2 border-emerald-200 bg-emerald-50/40 text-slate-900 font-semibold focus:border-emerald-600"
+                    className="w-full min-h-[48px] px-3.5 rounded-xl border-2 border-sky-200 bg-sky-50/40 text-slate-900 font-semibold focus:border-sky-600"
                   >
                     {profesionalesDisponibles.map((prof) => (
                       <option key={prof.id} value={prof.id}>
@@ -563,7 +560,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     ))}
                   </select>
                   {selectedProfesional && (
-                    <p className="text-xs text-emerald-800 mt-1.5 flex items-center gap-1.5">
+                    <p className="text-xs text-sky-800 mt-1.5 flex items-center gap-1.5">
                       <Stethoscope className="w-3.5 h-3.5 shrink-0" />
                       <span>{selectedProfesional.box}</span>
                     </p>
@@ -578,7 +575,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                         Fecha de Atención
                       </label>
                       {bookingFecha && (
-                        <span className="text-xs font-bold text-emerald-700">
+                        <span className="text-xs font-bold text-sky-700">
                           {bookingFecha}
                         </span>
                       )}
@@ -634,14 +631,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                             }}
                             className={`min-h-[56px] px-3 py-2 rounded-xl border-2 flex flex-col items-center justify-center transition-all cursor-pointer ${
                               isSelected
-                                ? 'bg-emerald-600 border-emerald-700 text-white shadow-md ring-2 ring-emerald-200'
-                                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 hover:bg-emerald-100'
+                                ? 'bg-sky-600 border-sky-700 text-white shadow-md ring-2 ring-sky-200'
+                                : 'bg-sky-50/70 border-sky-300 text-sky-950 hover:bg-sky-100'
                             }`}
                           >
                             <span className="text-sm font-extrabold tabular-nums">{time} hrs</span>
                             <span
                               className={`text-[11px] font-semibold mt-0.5 ${
-                                isSelected ? 'text-emerald-100' : 'text-emerald-700'
+                                isSelected ? 'text-sky-100' : 'text-sky-700'
                               }`}
                             >
                               Disponible
@@ -658,7 +655,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   <button
                     type="submit"
                     disabled={bookingSubmitting || !bookingFecha || !bookingHora}
-                    className="w-full min-h-[52px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-base shadow-md shadow-emerald-700/20 active:scale-[0.99] transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full min-h-[52px] rounded-2xl bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-base shadow-md shadow-sky-700/20 active:scale-[0.99] transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <CalendarPlus className="w-5 h-5" />
                     <span>{bookingSubmitting ? 'Confirmando...' : 'Confirmar Reserva'}</span>
@@ -691,7 +688,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <button
                 type="button"
                 onClick={() => openReservarView()}
-                className="min-h-[40px] px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-xs hover:bg-emerald-100 transition-colors flex items-center gap-1 cursor-pointer"
+                className="min-h-[40px] px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 font-bold text-xs hover:bg-sky-100 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Nueva Hora</span>
@@ -705,7 +702,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <button
                   type="button"
                   onClick={() => openReservarView()}
-                  className="mt-3 min-h-[44px] px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  className="mt-3 min-h-[44px] px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold cursor-pointer"
                 >
                   Reservar una hora
                 </button>
@@ -723,7 +720,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer ${
                       cita.estado === 'Cancelada'
                         ? 'border-slate-200 bg-slate-50/70 opacity-80 hover:opacity-100'
-                        : 'border-slate-200 bg-white hover:border-emerald-400 hover:shadow-sm'
+                        : 'border-slate-200 bg-white hover:border-sky-400 hover:shadow-sm'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -740,20 +737,20 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     </div>
 
                     {/* Nombre real y completo del doctor */}
-                    <div className="mt-2 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-800">
-                      <Stethoscope className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div className="mt-2 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-sky-800">
+                      <Stethoscope className="w-4 h-4 text-sky-600 shrink-0" />
                       <span>{cita.profesionalNombre}</span>
                     </div>
 
                     <div className="mt-2 space-y-1 text-xs text-slate-600">
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                         <span className="tabular-nums">
                           {cita.fecha} · <strong>{cita.hora} hrs</strong>
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <MapPin className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                         <span>{cita.lugar}</span>
                       </div>
                     </div>
@@ -762,7 +759,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       <span className="text-slate-500 font-medium truncate">
                         Paciente: <strong className="text-slate-700">{cita.pacienteNombre}</strong>
                       </span>
-                      <span className="text-emerald-700 font-bold flex items-center gap-0.5 shrink-0">
+                      <span className="text-sky-700 font-bold flex items-center gap-0.5 shrink-0">
                         Ver detalle
                         <ChevronRight className="w-4 h-4" />
                       </span>
@@ -796,7 +793,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAddCargaModal(true)}
-                className="min-h-[40px] px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-xs hover:bg-emerald-100 transition-colors flex items-center gap-1 cursor-pointer"
+                className="min-h-[40px] px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 font-bold text-xs hover:bg-sky-100 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Agregar</span>
@@ -819,7 +816,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   <button
                     type="button"
                     onClick={() => openReservarView(carga.id)}
-                    className="min-h-[42px] px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shrink-0 active:scale-95 transition-all cursor-pointer"
+                    className="min-h-[42px] px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shrink-0 active:scale-95 transition-all cursor-pointer"
                   >
                     Agendar Hora
                   </button>
@@ -827,8 +824,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               ))}
             </div>
 
-            <div className="mt-5 p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-xs text-emerald-900 flex items-start gap-2">
-              <Users className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+            <div className="mt-5 p-3.5 rounded-2xl bg-sky-50/70 border border-sky-100 text-xs text-sky-900 flex items-start gap-2">
+              <Users className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
               <span>
                 Las cargas familiares registradas pueden recibir atención en la posta rural bajo su número de contacto ({usuario.celular}).
               </span>
@@ -867,8 +864,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     <span
                       className={`text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
                         der.estado === 'Cita Asignada'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-teal-100 text-teal-800'
+                          ? 'bg-sky-100 text-sky-800'
+                          : 'bg-cyan-100 text-cyan-800'
                       }`}
                     >
                       {der.estado}
@@ -877,11 +874,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
                   <div className="mt-2 space-y-1 text-xs text-slate-600">
                     <div className="flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <Building2 className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                       <span>{der.hospital}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                       <span>Fecha de ingreso de solicitud: {der.fechaSolicitud}</span>
                     </div>
                   </div>
@@ -894,7 +891,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               ))}
             </div>
 
-            <div className="mt-5 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950">
+            <div className="mt-5 p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-xs text-sky-950">
               <p className="font-bold">Información de Traslado Rural:</p>
               <p className="mt-0.5">
                 Si requiere apoyo de traslado o ambulancia municipal para acudir al hospital provincial, coordine con su posta en {usuario.ciudad}.
@@ -940,12 +937,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
             <div className="mt-5 space-y-3 text-sm">
               {/* Profesional asignado */}
-              <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">
+              <div className="p-3.5 rounded-2xl bg-sky-50/70 border border-sky-200/80">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-sky-700 block">
                   Profesional Asignado
                 </span>
                 <p className="font-extrabold text-slate-900 mt-0.5 flex items-center gap-2">
-                  <Stethoscope className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <Stethoscope className="w-4 h-4 text-sky-700 shrink-0" />
                   <span>{selectedCita.profesionalNombre}</span>
                 </p>
               </div>
@@ -960,7 +957,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   RUT: <strong>{selectedCita.pacienteRut}</strong>
                 </p>
                 {selectedCita.esCargaFamiliar && selectedCita.agendadoPorNombre && (
-                  <p className="text-xs text-emerald-800 font-semibold mt-1">
+                  <p className="text-xs text-sky-800 font-semibold mt-1">
                     Agendada por cuidador/titular: {selectedCita.agendadoPorNombre}
                   </p>
                 )}
@@ -980,8 +977,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
                     Bloque Horario
                   </span>
-                  <p className="font-extrabold text-emerald-800 mt-0.5 flex items-center gap-1.5 tabular-nums">
-                    <Clock className="w-4 h-4 text-emerald-600" />
+                  <p className="font-extrabold text-sky-800 mt-0.5 flex items-center gap-1.5 tabular-nums">
+                    <Clock className="w-4 h-4 text-sky-600" />
                     <span>{selectedCita.hora} hrs</span>
                   </p>
                 </div>
@@ -993,17 +990,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   Lugar de Atención y Box
                 </span>
                 <p className="font-bold text-slate-900 mt-0.5 flex items-start gap-1.5">
-                  <MapPin className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <MapPin className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
                   <span>{selectedCita.lugar}</span>
                 </p>
-                <p className="text-xs font-semibold text-emerald-800 mt-1 ml-5">
+                <p className="text-xs font-semibold text-sky-800 mt-1 ml-5">
                   {selectedCita.box}
                 </p>
               </div>
 
               {/* Indicaciones previas */}
-              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-200/70 flex items-start gap-2.5 text-xs text-slate-700">
-                <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-2xl bg-sky-50/40 border border-sky-200/70 flex items-start gap-2.5 text-xs text-slate-700">
+                <Info className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900 block mb-0.5">Indicaciones previas</span>
                   <p>{selectedCita.indicaciones}</p>
@@ -1077,7 +1074,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </button>
 
             <div className="flex items-center gap-3 pb-4 border-b border-slate-100 mb-4">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-xl shadow-md shadow-emerald-700/20">
+              <div className="w-14 h-14 rounded-2xl bg-sky-600 text-white flex items-center justify-center font-bold text-xl shadow-md shadow-sky-700/20">
                 {usuario.nombre.charAt(0)}
                 {usuario.apellidos.charAt(0)}
               </div>
@@ -1085,7 +1082,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <h3 className="font-extrabold text-slate-900 text-lg leading-tight">
                   {usuario.nombre} {usuario.apellidos}
                 </h3>
-                <span className="text-xs font-semibold text-emerald-700 mt-0.5 inline-block">
+                <span className="text-xs font-semibold text-sky-700 mt-0.5 inline-block">
                   Paciente Rural Activo
                 </span>
               </div>
@@ -1125,7 +1122,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   type="button"
                   onClick={() => setFontSize('normal')}
                   className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                    fontSize === 'normal' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600'
+                    fontSize === 'normal' ? 'bg-white text-sky-800 shadow-xs' : 'text-slate-600'
                   }`}
                 >
                   A
@@ -1134,7 +1131,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   type="button"
                   onClick={() => setFontSize('large')}
                   className={`px-2.5 py-1 text-sm font-bold rounded-lg transition-all cursor-pointer ${
-                    fontSize === 'large' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600'
+                    fontSize === 'large' ? 'bg-white text-sky-800 shadow-xs' : 'text-slate-600'
                   }`}
                 >
                   A+
@@ -1143,7 +1140,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   type="button"
                   onClick={() => setFontSize('xl')}
                   className={`px-2.5 py-1 text-base font-bold rounded-lg transition-all cursor-pointer ${
-                    fontSize === 'xl' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600'
+                    fontSize === 'xl' ? 'bg-white text-sky-800 shadow-xs' : 'text-slate-600'
                   }`}
                 >
                   A++
@@ -1237,7 +1234,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full min-h-[46px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all cursor-pointer"
+                  className="w-full min-h-[46px] rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold transition-all cursor-pointer"
                 >
                   Guardar Familiar
                 </button>

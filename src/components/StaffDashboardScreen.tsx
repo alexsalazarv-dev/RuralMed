@@ -8,8 +8,8 @@ import {
   calculateStatsForRange,
   toISODateLocal,
 } from '../lib/appointmentsService.ts';
+import { RURALMED_LOGO_URL } from './Header.tsx';
 import {
-  HeartPulse,
   LogOut,
   Calendar,
   BarChart3,
@@ -32,7 +32,7 @@ function CircularGauge({
   percentage,
   label,
   sublabel,
-  accentClass = 'text-emerald-600',
+  accentClass = 'text-sky-600',
 }: {
   percentage: number;
   label: string;
@@ -55,7 +55,7 @@ function CircularGauge({
             fill="none"
             stroke="currentColor"
             strokeWidth="10"
-            className="text-emerald-100"
+            className="text-sky-100"
           />
           <circle
             cx="50"
@@ -155,11 +155,11 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
   const getStatusStyle = (estado: EstadoCita) => {
     switch (estado) {
       case 'Confirmada':
-        return 'bg-emerald-100 text-emerald-900 border border-emerald-200';
+        return 'bg-sky-100 text-sky-900 border border-sky-200';
       case 'En Espera':
         return 'bg-amber-100 text-amber-900 border border-amber-200';
       case 'Atendida':
-        return 'bg-teal-100 text-teal-900 border border-teal-200';
+        return 'bg-cyan-100 text-cyan-900 border border-cyan-200';
       case 'Cancelada':
         return 'bg-rose-100 text-rose-800 border border-rose-200';
     }
@@ -168,16 +168,15 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-5 sm:py-7 flex flex-col min-h-screen">
       {/* Top Bar */}
-      <header className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-slate-200">
+      <header className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-sky-100">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-md shadow-emerald-700/20">
-            <HeartPulse className="w-6 h-6 stroke-[2.2]" />
-          </div>
-          <div>
-            <span className="text-xl font-extrabold tracking-tight text-slate-900 block leading-tight">
-              Rural<span className="text-emerald-600">Med</span>
-            </span>
-            <span className="text-xs font-semibold text-emerald-700 block">
+          <img
+            src={RURALMED_LOGO_URL}
+            alt="RuralMed"
+            className="h-[40px] w-auto object-contain rounded-lg"
+          />
+          <div className="border-l border-slate-200 pl-3">
+            <span className="text-xs sm:text-sm font-bold text-sky-700 block">
               Panel de Equipo de Salud
             </span>
           </div>
@@ -208,13 +207,13 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
       </div>
 
       {/* Main Section Tabs */}
-      <div className="flex items-center gap-2 mt-4 sm:mt-6 mb-6 p-1.5 bg-slate-100 rounded-2xl border border-slate-200/80 w-full sm:w-fit">
+      <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-6 mb-6 p-1.5 bg-slate-100 rounded-2xl border border-slate-200/80 w-full sm:w-fit">
         <button
           type="button"
           onClick={() => setActiveTab('agenda')}
           className={`flex-1 sm:flex-initial min-h-[44px] px-5 py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'agenda'
-              ? 'bg-emerald-600 text-white shadow-sm'
+              ? 'bg-sky-600 text-white shadow-sm'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
@@ -227,7 +226,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
           onClick={() => setActiveTab('reportes')}
           className={`flex-1 sm:flex-initial min-h-[44px] px-5 py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'reportes'
-              ? 'bg-emerald-600 text-white shadow-sm'
+              ? 'bg-sky-600 text-white shadow-sm'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
@@ -242,7 +241,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
           {/* Filters Card */}
           <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
-              <Filter className="w-4 h-4 text-emerald-600" />
+              <Filter className="w-4 h-4 text-sky-600" />
               <span>Filtros de Agenda</span>
             </div>
 
@@ -262,7 +261,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                     type="checkbox"
                     checked={showAllDates}
                     onChange={(e) => setShowAllDates(e.target.checked)}
-                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                   />
                   <span>Mostrar todas las fechas</span>
                 </label>
@@ -314,7 +313,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                 Pacientes Agendados ({filteredAgendaCitas.length})
               </h2>
               {!showAllDates && (
-                <span className="text-xs font-semibold text-emerald-700 tabular-nums">
+                <span className="text-xs font-semibold text-sky-700 tabular-nums">
                   Jornada: {agendaDate}
                 </span>
               )}
@@ -339,8 +338,8 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                   >
                     <div className="space-y-2 min-w-0">
                       <div className="flex flex-wrap items-center gap-2.5">
-                        <span className="inline-flex items-center gap-1.5 text-sm font-extrabold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200 tabular-nums">
-                          <Clock className="w-4 h-4 text-emerald-600" />
+                        <span className="inline-flex items-center gap-1.5 text-sm font-extrabold text-sky-800 bg-sky-50 px-3 py-1 rounded-xl border border-sky-200 tabular-nums">
+                          <Clock className="w-4 h-4 text-sky-600" />
                           {cita.fecha} · {cita.hora} hrs
                         </span>
                         <span
@@ -362,7 +361,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                             RUT: <strong className="text-slate-800">{cita.pacienteRut}</strong>
                           </span>
                           <span className="inline-flex items-center gap-1 tabular-nums">
-                            <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                            <Phone className="w-3.5 h-3.5 text-sky-600" />
                             <strong>{cita.pacienteTelefono}</strong>
                           </span>
                         </div>
@@ -371,7 +370,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 pt-1">
                         <span className="font-bold text-slate-800">{cita.especialidad}</span>
                         <span aria-hidden="true">·</span>
-                        <span className="inline-flex items-center gap-1 text-emerald-800 font-semibold">
+                        <span className="inline-flex items-center gap-1 text-sky-800 font-semibold">
                           <Stethoscope className="w-3.5 h-3.5" />
                           {cita.profesionalNombre}
                         </span>
@@ -404,7 +403,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                             <button
                               type="button"
                               onClick={() => handleStatusChange(cita.id, 'Atendida')}
-                              className="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                              className="min-h-[44px] px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
                             >
                               <CheckCircle2 className="w-4 h-4" />
                               <span>Marcar Atendida</span>
@@ -457,7 +456,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                     reportMode === 'dia'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-sky-600 text-white'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -468,7 +467,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                   onClick={() => setReportMode('rango')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                     reportMode === 'rango'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-sky-600 text-white'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -535,17 +534,17 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               <p className="text-3xl sm:text-4xl font-extrabold text-slate-900 mt-2 tabular-nums">
                 {stats.totalAgendadas}
               </p>
-              <span className="text-xs text-emerald-700 font-semibold mt-1 block">
+              <span className="text-xs text-sky-700 font-semibold mt-1 block">
                 {stats.totalPendientes} activas pendientes
               </span>
             </div>
 
-            <div className="p-5 rounded-3xl bg-emerald-50/70 border border-emerald-200 shadow-xs">
-              <span className="text-xs font-bold text-emerald-800 block">Total Citas Atendidas</span>
-              <p className="text-3xl sm:text-4xl font-extrabold text-emerald-900 mt-2 tabular-nums">
+            <div className="p-5 rounded-3xl bg-sky-50/70 border border-sky-200 shadow-xs">
+              <span className="text-xs font-bold text-sky-800 block">Total Citas Atendidas</span>
+              <p className="text-3xl sm:text-4xl font-extrabold text-sky-900 mt-2 tabular-nums">
                 {stats.totalAtendidas}
               </p>
-              <span className="text-xs text-emerald-700 font-semibold mt-1 block">
+              <span className="text-xs text-sky-700 font-semibold mt-1 block">
                 Consultas completadas
               </span>
             </div>
@@ -560,12 +559,12 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               </span>
             </div>
 
-            <div className="p-5 rounded-3xl bg-teal-50/70 border border-teal-200 shadow-xs">
-              <span className="text-xs font-bold text-teal-800 block">Total Cupos Libres</span>
-              <p className="text-3xl sm:text-4xl font-extrabold text-teal-900 mt-2 tabular-nums">
+            <div className="p-5 rounded-3xl bg-cyan-50/70 border border-cyan-200 shadow-xs">
+              <span className="text-xs font-bold text-cyan-800 block">Total Cupos Libres</span>
+              <p className="text-3xl sm:text-4xl font-extrabold text-cyan-900 mt-2 tabular-nums">
                 {stats.cuposLibres}
               </p>
-              <span className="text-xs text-teal-700 font-semibold mt-1 block tabular-nums">
+              <span className="text-xs text-cyan-700 font-semibold mt-1 block tabular-nums">
                 De {stats.cuposTotales} cupos totales
               </span>
             </div>
@@ -577,14 +576,14 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               percentage={stats.porcentajeAsistencia}
               label="Porcentaje de Asistencia"
               sublabel={`${stats.totalAtendidas} atendidas de ${stats.totalAgendadas} citas agendadas`}
-              accentClass="text-emerald-600"
+              accentClass="text-sky-600"
             />
 
             <CircularGauge
               percentage={stats.porcentajeOcupacion}
               label="Porcentaje de Ocupación Diaria"
               sublabel={`${stats.cuposTomados} cupos ocupados de ${stats.cuposTotales} cupos totales`}
-              accentClass="text-teal-600"
+              accentClass="text-cyan-600"
             />
           </div>
 
@@ -600,13 +599,13 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                   label: 'Atendidas',
                   count: stats.totalAtendidas,
                   total: Math.max(1, stats.totalAgendadas),
-                  barClass: 'bg-emerald-600',
+                  barClass: 'bg-sky-600',
                 },
                 {
                   label: 'Pendientes (Confirmadas / En Espera)',
                   count: stats.totalPendientes,
                   total: Math.max(1, stats.totalAgendadas),
-                  barClass: 'bg-teal-500',
+                  barClass: 'bg-cyan-500',
                 },
                 {
                   label: 'Canceladas',
@@ -618,7 +617,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                   label: 'Cupos Libres',
                   count: stats.cuposLibres,
                   total: Math.max(1, stats.cuposTotales),
-                  barClass: 'bg-emerald-300',
+                  barClass: 'bg-sky-300',
                 },
               ].map((row) => {
                 const pct = Math.round((row.count / row.total) * 100);

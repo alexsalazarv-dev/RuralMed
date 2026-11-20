@@ -399,6 +399,51 @@ export function getCitasDePaciente(citas: CitaMedica[], rutUsuario: string): Cit
 }
 
 /**
+ * Deletes all appointments associated with a professional (by profesionalId or nombre)
+ */
+export async function deleteCitasByProfesional(profesionalId: string, profesionalNombre?: string): Promise<CitaMedica[]> {
+  const current = loadAllCitas();
+  const updated = current.filter(
+    (c) =>
+      c.profesionalId !== profesionalId &&
+      (!profesionalNombre || c.profesionalNombre.toLowerCase() !== profesionalNombre.toLowerCase())
+  );
+  saveAllCitas(updated);
+
+  try {
+    if (profesionalNombre) {
+      await supabase.from('citas').delete().eq('profesional', profesionalNombre);
+    }
+  } catch {
+    // ignore RLS errors
+  }
+
+  return updated;
+}
+
+/**
+ * Deletes all appointments associated with a patient RUT
+ */
+export async function deleteCitasByPaciente(rutPaciente: string): Promise<CitaMedica[]> {
+  const cleanTarget = rutPaciente.replace(/\./g, '').toUpperCase();
+  const current = loadAllCitas();
+  const updated = current.filter((c) => {
+    const pRut = c.pacienteRut.replace(/\./g, '').toUpperCase();
+    const aRut = c.agendadoPorRut.replace(/\./g, '').toUpperCase();
+    return pRut !== cleanTarget && aRut !== cleanTarget;
+  });
+  saveAllCitas(updated);
+
+  try {
+    await supabase.from('citas').delete().eq('paciente_rut', rutPaciente);
+  } catch {
+    // ignore RLS errors
+  }
+
+  return updated;
+}
+
+/**
  * Computes real-time statistics for a date or date range and optional profesionalId filter
  */
 export function calculateStatsForRange(
