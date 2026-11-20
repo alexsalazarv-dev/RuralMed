@@ -1,17 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Usuario } from '../lib/supabase.ts';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Usuario, FuncionarioDB, CitaDB, EstadoCita } from '../lib/supabase.ts';
 import {
-  TIPOS_ATENCION,
-  getProfesionalesPorEspecialidad,
-  getProfesionalById,
+  TIPOS_ATENCION_BASE,
+  HORARIOS_POSTA,
+  LUGAR_POSTA_DEFAULT,
+  getIndicacionesPorEspecialidad,
+  getBoxPorRol,
 } from '../lib/clinicData.ts';
 import {
-  CitaMedica,
-  EstadoCita,
-  loadAllCitas,
-  bookAppointment,
-  updateAppointmentStatus,
-  getCitasDePaciente,
+  fetchActiveFuncionarios,
+  fetchOccupiedCitas,
+  fetchCitasByUsuario,
+  bookAppointmentInSupabase,
+  updateCitaEstadoInSupabase,
   isSlotOccupied,
   getDayAvailability,
   toISODateLocal,
@@ -39,6 +40,7 @@ import {
   Clock,
   AlertCircle,
   Info,
+  RefreshCw,
 } from 'lucide-react';
 
 interface DashboardScreenProps {
@@ -55,16 +57,6 @@ interface CargaFamiliar {
   rut: string;
   parentesco: string;
   edad: number;
-}
-
-interface Derivacion {
-  id: string;
-  especialidad: string;
-  hospital: string;
-  fechaSolicitud: string;
-  estado: 'En Evaluación' | 'Cita Asignada' | 'En Lista de Espera';
-  prioridad: 'Alta' | 'Media';
-  medicoSolicitante: string;
 }
 
 function getEstadoBadgeStyle(estado: EstadoCita): string {
@@ -90,117 +82,147 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [activeView, setActiveView] = useState<'home' | 'reservar' | 'mis-citas' | 'cargas' | 'derivaciones'>('home');
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  // Shared real-time appointments from appointmentsService
-  const [allCitas, setAllCitas] = useState<CitaMedica[]>(() => loadAllCitas());
+  // Real-time Supabase data states
+  const [funcionariosActivos, setFuncionariosActivos] = useState<FuncionarioDB[]>([]);
+  const [occupiedCitas, setOccupiedCitas] = useState<CitaDB[]>([]);
+  const [misCitas, setMisCitas] = useState<CitaDB[]>([]);
+  const [loadingData, setLoadingData] = useState<boolean>(false);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   // Detail modal state for "Mis Citas Médicas"
-  const [selectedCita, setSelectedCita] = useState<CitaMedica | null>(null);
-  const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null);
+  const [selectedCita, setSelectedCita] = useState<CitaDB | null>(null);
+  const [confirmingCancelId, setConfirmingCancelId] = useState<number | null>(null);
+  const [cancelling, setCancelling] = useState<boolean>(false);
 
-  // Sync appointments whenever returning to views or storage changes
-  useEffect(() => {
-    const sync = () => setAllCitas(loadAllCitas());
-    window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
-  }, []);
-
-  // Cargas Familiares
-  const [cargas, setCargas] = useState<CargaFamiliar[]>([
-    {
-      id: 'carga-1',
-      nombre: 'Rosa María Silva',
-      rut: '7.842.115-3',
-      parentesco: 'Madre (Adulto Mayor)',
-      edad: 78,
-    },
-    {
-      id: 'carga-2',
-      nombre: 'Matías González',
-      rut: '22.341.980-4',
-      parentesco: 'Hijo',
-      edad: 14,
-    },
-  ]);
-
-  // Derivaciones
-  const [derivaciones] = useState<Derivacion[]>([
-    {
-      id: '1',
-      especialidad: 'Oftalmología (Vicio de Refracción / Cataratas)',
-      hospital: `Hospital Provincial de Referencia (${usuario.ciudad})`,
-      fechaSolicitud: '12 de Octubre, 2026',
-      estado: 'Cita Asignada',
-      prioridad: 'Alta',
-      medicoSolicitante: 'Dra. Daniela Rojas Paredes',
-    },
-    {
-      id: '2',
-      especialidad: 'Traumatología y Ortopedia',
-      hospital: 'Hospital Base Regional',
-      fechaSolicitud: '02 de Noviembre, 2026',
-      estado: 'En Lista de Espera',
-      prioridad: 'Media',
-      medicoSolicitante: 'Dr. Alejandro Morales Fuentes',
-    },
-  ]);
+  // Cargas Familiares (session list so caregiver can book for family)
+  const [cargas, setCargas] = useState<CargaFamiliar[]>([]);
+  const [showAddCargaModal, setShowAddCargaModal] = useState(false);
+  const [newCargaNombre, setNewCargaNombre] = useState('');
+  const [newCargaRut, setNewCargaRut] = useState('');
+  const [newCargaParentesco, setNewCargaParentesco] = useState('Padre / Madre');
+  const [newCargaEdad, setNewCargaEdad] = useState('65');
 
   // Booking form state
   const [bookingPara, setBookingPara] = useState<string>('titular');
-  const [bookingEspecialidad, setBookingEspecialidad] = useState<string>(TIPOS_ATENCION[0]);
-  const profesionalesDisponibles = useMemo(
-    () => getProfesionalesPorEspecialidad(bookingEspecialidad),
-    [bookingEspecialidad]
-  );
-
-  const [bookingProfesionalId, setBookingProfesionalId] = useState<string>(
-    () => getProfesionalesPorEspecialidad(TIPOS_ATENCION[0])[0]?.id || ''
-  );
-
-  const selectedProfesional = useMemo(
-    () => getProfesionalById(bookingProfesionalId) || profesionalesDisponibles[0],
-    [bookingProfesionalId, profesionalesDisponibles]
-  );
-
-  // Find first available date for selected professional
-  const findFirstAvailableDate = (profId: string, citasList: CitaMedica[]): string => {
-    const prof = getProfesionalById(profId);
-    if (!prof) return toISODateLocal(new Date());
-    const d = new Date();
-    for (let i = 0; i < 45; i++) {
-      const candidate = toISODateLocal(d);
-      const avail = getDayAvailability(citasList, prof, candidate);
-      if (avail.status === 'available') return candidate;
-      d.setDate(d.getDate() + 1);
-    }
-    return '';
-  };
-
-  const [bookingFecha, setBookingFecha] = useState<string>(() =>
-    findFirstAvailableDate(getProfesionalesPorEspecialidad(TIPOS_ATENCION[0])[0]?.id || '', loadAllCitas())
-  );
+  const [bookingEspecialidad, setBookingEspecialidad] = useState<string>(TIPOS_ATENCION_BASE[0]);
+  const [bookingFuncionarioId, setBookingFuncionarioId] = useState<number | ''>('');
+  const [bookingFecha, setBookingFecha] = useState<string>('');
   const [bookingHora, setBookingHora] = useState<string>('');
   const [bookingError, setBookingError] = useState<string | null>(null);
-  const [bookingSuccess, setBookingSuccess] = useState<CitaMedica | null>(null);
-  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState<CitaDB | null>(null);
+  const [bookingSubmitting, setBookingSubmitting] = useState<boolean>(false);
 
-  // When specialty changes, automatically select first doctor in that specialty & reset date/time
-  const handleEspecialidadChange = (newEsp: string) => {
-    setBookingEspecialidad(newEsp);
-    const list = getProfesionalesPorEspecialidad(newEsp);
-    const firstProf = list[0];
-    if (firstProf) {
-      setBookingProfesionalId(firstProf.id);
-      const nextDate = findFirstAvailableDate(firstProf.id, allCitas);
+  // Dynamic list of specialties combining base + active DB funcionarios
+  const tiposAtencionDisponibles = useMemo(() => {
+    const set = new Set<string>(TIPOS_ATENCION_BASE);
+    funcionariosActivos.forEach((f) => {
+      if (f.especialidad) set.add(f.especialidad);
+    });
+    return Array.from(set);
+  }, [funcionariosActivos]);
+
+  // Active professionals filtered by selected "TIPO DE ATENCIÓN"
+  const profesionalesFiltrados = useMemo(() => {
+    return funcionariosActivos.filter(
+      (f) => f.activo && f.especialidad === bookingEspecialidad
+    );
+  }, [funcionariosActivos, bookingEspecialidad]);
+
+  const selectedProfesional = useMemo(() => {
+    if (typeof bookingFuncionarioId === 'number') {
+      return profesionalesFiltrados.find((f) => f.funcionario_id === bookingFuncionarioId) || null;
+    }
+    return profesionalesFiltrados[0] || null;
+  }, [bookingFuncionarioId, profesionalesFiltrados]);
+
+  const findFirstAvailableDate = useCallback(
+    (funcId: number, occupied: CitaDB[]): string => {
+      const d = new Date();
+      for (let i = 0; i < 45; i++) {
+        const candidate = toISODateLocal(d);
+        const avail = getDayAvailability(occupied, funcId, candidate);
+        if (avail.status === 'available') return candidate;
+        d.setDate(d.getDate() + 1);
+      }
+      return '';
+    },
+    []
+  );
+
+  // Load real data directly from Supabase
+  const refreshSupabaseData = useCallback(async () => {
+    setLoadingData(true);
+    setDataError(null);
+    try {
+      const [funcRes, occRes, myRes] = await Promise.all([
+        fetchActiveFuncionarios(),
+        fetchOccupiedCitas(),
+        usuario.usuario_id
+          ? fetchCitasByUsuario(usuario.usuario_id)
+          : Promise.resolve({ data: [] as CitaDB[], error: undefined }),
+      ]);
+
+      if (funcRes.error) setDataError(funcRes.error);
+      if (occRes.error) setDataError(occRes.error);
+      if (myRes.error) setDataError(myRes.error);
+
+      setFuncionariosActivos(funcRes.data);
+      setOccupiedCitas(occRes.data);
+      setMisCitas(myRes.data);
+
+      return { funcs: funcRes.data, occ: occRes.data, mine: myRes.data };
+    } finally {
+      setLoadingData(false);
+    }
+  }, [usuario.usuario_id]);
+
+  useEffect(() => {
+    refreshSupabaseData();
+  }, [refreshSupabaseData]);
+
+  // Keep selected doctor & date synchronized when specialty or loaded professionals change
+  useEffect(() => {
+    if (profesionalesFiltrados.length === 0) {
+      setBookingFuncionarioId('');
+      setBookingFecha('');
+      setBookingHora('');
+      return;
+    }
+
+    const stillValid = profesionalesFiltrados.some(
+      (p) => p.funcionario_id === bookingFuncionarioId
+    );
+    const activeProf = stillValid
+      ? profesionalesFiltrados.find((p) => p.funcionario_id === bookingFuncionarioId)!
+      : profesionalesFiltrados[0];
+
+    if (!stillValid) {
+      setBookingFuncionarioId(activeProf.funcionario_id);
+    }
+
+    const currentDateValid =
+      bookingFecha &&
+      getDayAvailability(occupiedCitas, activeProf.funcionario_id, bookingFecha).status ===
+        'available';
+
+    if (!currentDateValid) {
+      const nextDate = findFirstAvailableDate(activeProf.funcionario_id, occupiedCitas);
       setBookingFecha(nextDate);
       setBookingHora('');
     }
+  }, [profesionalesFiltrados, bookingFuncionarioId, bookingFecha, occupiedCitas, findFirstAvailableDate]);
+
+  const handleEspecialidadChange = (newEsp: string) => {
+    setBookingEspecialidad(newEsp);
+    setBookingFuncionarioId('');
+    setBookingFecha('');
+    setBookingHora('');
     setBookingError(null);
   };
 
-  // When doctor changes, find first available date for that doctor & reset selected time
-  const handleProfesionalChange = (newProfId: string) => {
-    setBookingProfesionalId(newProfId);
-    const nextDate = findFirstAvailableDate(newProfId, allCitas);
+  const handleProfesionalChange = (newFuncId: number) => {
+    setBookingFuncionarioId(newFuncId);
+    const nextDate = findFirstAvailableDate(newFuncId, occupiedCitas);
     setBookingFecha(nextDate);
     setBookingHora('');
     setBookingError(null);
@@ -212,25 +234,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     setBookingError(null);
   };
 
-  // Modal state for adding a new Family Member
-  const [showAddCargaModal, setShowAddCargaModal] = useState(false);
-  const [newCargaNombre, setNewCargaNombre] = useState('');
-  const [newCargaRut, setNewCargaRut] = useState('');
-  const [newCargaParentesco, setNewCargaParentesco] = useState('Padre / Madre');
-  const [newCargaEdad, setNewCargaEdad] = useState('65');
-
-  // Patient's own appointments (including cargas booked by this user)
-  const misCitas = useMemo(
-    () => getCitasDePaciente(allCitas, usuario.rut),
-    [allCitas, usuario.rut]
-  );
-
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBookingError(null);
 
+    if (!usuario.usuario_id) {
+      setBookingError('No se encontró el ID numérico de su cuenta (usuario_id). Por favor vuelva a iniciar sesión.');
+      return;
+    }
     if (!selectedProfesional) {
-      setBookingError('Por favor seleccione un profesional disponible.');
+      setBookingError('No hay un profesional disponible para la especialidad seleccionada.');
       return;
     }
     if (!bookingFecha) {
@@ -238,14 +251,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       return;
     }
     if (!bookingHora) {
-      setBookingError('Por favor seleccione un horario disponible en verde.');
-      return;
-    }
-
-    // Double check slot is free before calling service
-    if (isSlotOccupied(allCitas, selectedProfesional.id, bookingFecha, bookingHora)) {
-      setBookingError('Este horario ya no está disponible. Por favor elija otro bloque en verde.');
-      setBookingHora('');
+      setBookingError('Por favor seleccione un horario disponible.');
       return;
     }
 
@@ -253,37 +259,46 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
     try {
       const cargaSeleccionada = cargas.find((c) => c.id === bookingPara);
-      const esCarga = Boolean(cargaSeleccionada);
+      const pacienteNombre = cargaSeleccionada
+        ? cargaSeleccionada.nombre
+        : `${usuario.nombre} ${usuario.apellidos}`;
 
-      const res = await bookAppointment({
-        especialidad: bookingEspecialidad,
-        profesionalId: selectedProfesional.id,
-        profesionalNombre: selectedProfesional.nombre,
-        pacienteNombre: cargaSeleccionada
-          ? cargaSeleccionada.nombre
-          : `${usuario.nombre} ${usuario.apellidos}`,
-        pacienteRut: cargaSeleccionada ? cargaSeleccionada.rut : usuario.rut,
-        pacienteTelefono: usuario.celular,
-        agendadoPorRut: usuario.rut,
-        agendadoPorNombre: esCarga ? `${usuario.nombre} ${usuario.apellidos}` : undefined,
-        esCargaFamiliar: esCarga,
+      const res = await bookAppointmentInSupabase({
+        usuario_id: usuario.usuario_id,
+        funcionario_id: selectedProfesional.funcionario_id,
+        paciente_nombre: pacienteNombre,
+        tipo_atencion: bookingEspecialidad,
         fecha: bookingFecha,
         hora: bookingHora,
-        lugar: `Posta de Salud Rural de ${usuario.ciudad}`,
-        box: selectedProfesional.box,
-        indicaciones: selectedProfesional.indicaciones,
-        estado: 'Confirmada',
+        lugar: LUGAR_POSTA_DEFAULT,
       });
 
-      if (!res.success || !res.cita) {
-        setBookingError(res.error || 'No se pudo completar la reserva. Intente otro horario.');
-        setAllCitas(loadAllCitas());
+      if (!res.success) {
+        // Show Supabase error and DO NOT add appointment to list
+        setBookingError(res.error || 'No se pudo registrar la reserva. El cupo puede estar ocupado.');
+        // Reload occupied slots from Supabase so UI immediately reflects latest state
+        const occRes = await fetchOccupiedCitas();
+        setOccupiedCitas(occRes.data);
+        setBookingHora('');
         return;
       }
 
-      const refreshed = loadAllCitas();
-      setAllCitas(refreshed);
-      setBookingSuccess(res.cita);
+      // Reload fresh data from Supabase
+      await refreshSupabaseData();
+      setBookingSuccess(
+        res.cita || {
+          cita_id: 0,
+          usuario_id: usuario.usuario_id,
+          funcionario_id: selectedProfesional.funcionario_id,
+          paciente_nombre: pacienteNombre,
+          tipo_atencion: bookingEspecialidad,
+          fecha: bookingFecha,
+          hora: bookingHora,
+          lugar: LUGAR_POSTA_DEFAULT,
+          estado: 'Confirmada',
+          funcionarios: selectedProfesional,
+        }
+      );
       setBookingHora('');
 
       setTimeout(() => {
@@ -295,15 +310,25 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     }
   };
 
-  const handleConfirmCancelCita = async (citaId: string) => {
-    const updated = await updateAppointmentStatus(citaId, 'Cancelada');
-    setAllCitas(updated);
-    setConfirmingCancelId(null);
+  const handleConfirmCancelCita = async (citaId: number) => {
+    setCancelling(true);
+    setDataError(null);
+    try {
+      const res = await updateCitaEstadoInSupabase(citaId, 'Cancelada');
+      if (!res.success) {
+        setDataError(`No se pudo anular la cita: ${res.error}`);
+        return;
+      }
 
-    // Update detail modal if currently viewing this appointment
-    if (selectedCita && selectedCita.id === citaId) {
-      const fresh = updated.find((c) => c.id === citaId) || null;
-      setSelectedCita(fresh);
+      const refreshed = await refreshSupabaseData();
+      setConfirmingCancelId(null);
+
+      if (selectedCita && selectedCita.cita_id === citaId) {
+        const updatedCita = refreshed.mine.find((c) => c.cita_id === citaId) || null;
+        setSelectedCita(updatedCita);
+      }
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -323,22 +348,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     setShowAddCargaModal(false);
   };
 
-  const openReservarView = (preselectedPara?: string) => {
-    const fresh = loadAllCitas();
-    setAllCitas(fresh);
+  const openReservarView = async (preselectedPara?: string) => {
     if (preselectedPara) setBookingPara(preselectedPara);
     setBookingError(null);
     setBookingSuccess(null);
-    if (selectedProfesional) {
-      const avail = bookingFecha
-        ? getDayAvailability(fresh, selectedProfesional, bookingFecha)
-        : null;
-      if (!avail || avail.status !== 'available') {
-        setBookingFecha(findFirstAvailableDate(selectedProfesional.id, fresh));
-        setBookingHora('');
-      }
-    }
     setActiveView('reservar');
+    await refreshSupabaseData();
+  };
+
+  const openMisCitasView = async () => {
+    setActiveView('mis-citas');
+    await refreshSupabaseData();
   };
 
   return (
@@ -373,7 +393,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </div>
       </header>
 
-      {/* Greeting message in friendly typography */}
+      {/* Greeting message */}
       <div className="mt-6 mb-5">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
           Hola, {usuario.nombre}
@@ -389,7 +409,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         {activeView === 'home' && (
           <div className="animate-in fade-in duration-150">
             <div className="grid grid-cols-2 gap-3.5 sm:gap-5 mt-2">
-              {/* Módulo 1: Reservar Hora */}
               <button
                 type="button"
                 onClick={() => openReservarView()}
@@ -403,13 +422,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </span>
               </button>
 
-              {/* Módulo 2: Mis Citas */}
               <button
                 type="button"
-                onClick={() => {
-                  setAllCitas(loadAllCitas());
-                  setActiveView('mis-citas');
-                }}
+                onClick={openMisCitasView}
                 className="group p-5 sm:p-7 bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-sky-300 active:scale-95 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[145px] sm:min-h-[165px]"
               >
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cyan-50 text-cyan-700 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-cyan-600 group-hover:text-white transition-colors shadow-inner">
@@ -420,7 +435,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </span>
               </button>
 
-              {/* Módulo 3: Cargas Familiares */}
               <button
                 type="button"
                 onClick={() => setActiveView('cargas')}
@@ -434,7 +448,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </span>
               </button>
 
-              {/* Módulo 4: Derivaciones */}
               <button
                 type="button"
                 onClick={() => setActiveView('derivaciones')}
@@ -449,7 +462,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </button>
             </div>
 
-            {/* Quick Emergency Assistance Button */}
             <div className="mt-8 pt-4">
               <button
                 type="button"
@@ -463,22 +475,32 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </div>
         )}
 
-        {/* SUBVIEW 1: RESERVAR HORA MÉDICA */}
+        {/* SUBVIEW 1: RESERVAR HORA MÉDICA (100% Supabase) */}
         {activeView === 'reservar' && (
           <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm animate-in fade-in">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveView('home')}
+                  className="p-2 -ml-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+                  aria-label="Volver al menú"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">Reservar Hora Médica</h2>
+                  <p className="text-xs text-slate-500">{LUGAR_POSTA_DEFAULT}</p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setActiveView('home')}
-                className="p-2 -ml-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-                aria-label="Volver al menú"
+                onClick={refreshSupabaseData}
+                aria-label="Actualizar disponibilidad"
+                className="p-2 rounded-xl text-slate-500 hover:text-sky-700 hover:bg-sky-50 cursor-pointer"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <RefreshCw className={`w-4 h-4 ${loadingData ? 'animate-spin' : ''}`} />
               </button>
-              <div>
-                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">Reservar Hora Médica</h2>
-                <p className="text-xs text-slate-500">Posta de Salud Rural de {usuario.ciudad}</p>
-              </div>
             </div>
 
             {bookingSuccess ? (
@@ -488,8 +510,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </div>
                 <h3 className="text-xl font-bold text-slate-900">¡Hora Reservada con Éxito!</h3>
                 <p className="text-sm text-slate-600 mt-1.5 max-w-sm mx-auto">
-                  Cita confirmada con <strong>{bookingSuccess.profesionalNombre}</strong> para el{' '}
-                  <strong>{bookingSuccess.fecha}</strong> a las <strong>{bookingSuccess.hora} hrs</strong>.
+                  Cita confirmada con{' '}
+                  <strong>{bookingSuccess.funcionarios?.nombre_completo || 'Profesional asignado'}</strong>{' '}
+                  para el <strong>{bookingSuccess.fecha}</strong> a las{' '}
+                  <strong>{bookingSuccess.hora}</strong>.
                 </p>
                 <p className="text-xs text-sky-700 font-semibold mt-2">
                   Redirigiendo a Mis Citas Médicas...
@@ -497,10 +521,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </div>
             ) : (
               <form onSubmit={handleBookingSubmit} className="space-y-5">
-                {bookingError && (
+                {(bookingError || dataError) && (
                   <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-start gap-2.5 text-xs sm:text-sm">
                     <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                    <p className="font-medium">{bookingError}</p>
+                    <p className="font-medium">{bookingError || dataError}</p>
                   </div>
                 )}
 
@@ -535,7 +559,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     onChange={(e) => handleEspecialidadChange(e.target.value)}
                     className="w-full min-h-[48px] px-3.5 rounded-xl border-2 border-slate-200 text-slate-900 font-semibold focus:border-sky-600 bg-white"
                   >
-                    {TIPOS_ATENCION.map((tipo) => (
+                    {tiposAtencionDisponibles.map((tipo) => (
                       <option key={tipo} value={tipo}>
                         {tipo}
                       </option>
@@ -543,31 +567,39 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   </select>
                 </div>
 
-                {/* 2. PROFESIONAL / DOCTOR (dinámico según especialidad) */}
+                {/* 2. PROFESIONAL / DOCTOR (desde tabla `funcionarios` con activo=true) */}
                 <div>
                   <label className="block text-xs font-bold tracking-wide text-slate-700 mb-1.5">
                     Profesional / Doctor
                   </label>
-                  <select
-                    value={selectedProfesional?.id || ''}
-                    onChange={(e) => handleProfesionalChange(e.target.value)}
-                    className="w-full min-h-[48px] px-3.5 rounded-xl border-2 border-sky-200 bg-sky-50/40 text-slate-900 font-semibold focus:border-sky-600"
-                  >
-                    {profesionalesDisponibles.map((prof) => (
-                      <option key={prof.id} value={prof.id}>
-                        {prof.nombre} — {prof.titulo}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedProfesional && (
-                    <p className="text-xs text-sky-800 mt-1.5 flex items-center gap-1.5">
-                      <Stethoscope className="w-3.5 h-3.5 shrink-0" />
-                      <span>{selectedProfesional.box}</span>
-                    </p>
+                  {profesionalesFiltrados.length === 0 ? (
+                    <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
+                      No hay profesionales activos registrados para &quot;{bookingEspecialidad}&quot; en Supabase.
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={selectedProfesional?.funcionario_id || ''}
+                        onChange={(e) => handleProfesionalChange(Number(e.target.value))}
+                        className="w-full min-h-[48px] px-3.5 rounded-xl border-2 border-sky-200 bg-sky-50/40 text-slate-900 font-semibold focus:border-sky-600"
+                      >
+                        {profesionalesFiltrados.map((prof) => (
+                          <option key={prof.funcionario_id} value={prof.funcionario_id}>
+                            {prof.nombre_completo} — {prof.rol}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedProfesional && (
+                        <p className="text-xs text-sky-800 mt-1.5 flex items-center gap-1.5">
+                          <Stethoscope className="w-3.5 h-3.5 shrink-0" />
+                          <span>{getBoxPorRol(selectedProfesional.rol, selectedProfesional.especialidad)}</span>
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
-                {/* 3. FECHA DE ATENCIÓN (Calendario en tiempo real: Verde = libre, Rojo = sin cupos / no atiende) */}
+                {/* 3. FECHA DE ATENCIÓN */}
                 {selectedProfesional && (
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
@@ -575,31 +607,29 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                         Fecha de Atención
                       </label>
                       {bookingFecha && (
-                        <span className="text-xs font-bold text-sky-700">
-                          {bookingFecha}
-                        </span>
+                        <span className="text-xs font-bold text-sky-700">{bookingFecha}</span>
                       )}
                     </div>
                     <AvailabilityCalendar
-                      profesional={selectedProfesional}
-                      citas={allCitas}
+                      funcionarioId={selectedProfesional.funcionario_id}
+                      occupiedCitas={occupiedCitas}
                       selectedDate={bookingFecha}
                       onSelectDate={handleSelectDate}
                     />
                   </div>
                 )}
 
-                {/* 4. HORARIO PREFERENTE (Verde = Disponible, Rojo deshabilitado = No disponible) */}
+                {/* 4. HORARIO PREFERENTE */}
                 {selectedProfesional && bookingFecha && (
                   <div>
                     <label className="block text-xs font-bold tracking-wide text-slate-700 mb-2">
                       Horario Preferente
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                      {selectedProfesional.horarios.map((time) => {
+                      {HORARIOS_POSTA.map((time) => {
                         const occupied = isSlotOccupied(
-                          allCitas,
-                          selectedProfesional.id,
+                          occupiedCitas,
+                          selectedProfesional.funcionario_id,
                           bookingFecha,
                           time
                         );
@@ -613,7 +643,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                               disabled
                               className="min-h-[56px] px-3 py-2 rounded-xl border-2 border-rose-200 bg-rose-50 text-rose-700 flex flex-col items-center justify-center cursor-not-allowed opacity-90"
                             >
-                              <span className="text-sm font-extrabold tabular-nums">{time} hrs</span>
+                              <span className="text-sm font-extrabold tabular-nums">{time}</span>
                               <span className="text-[11px] font-bold text-rose-600 mt-0.5">
                                 No disponible
                               </span>
@@ -635,7 +665,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                                 : 'bg-sky-50/70 border-sky-300 text-sky-950 hover:bg-sky-100'
                             }`}
                           >
-                            <span className="text-sm font-extrabold tabular-nums">{time} hrs</span>
+                            <span className="text-sm font-extrabold tabular-nums">{time}</span>
                             <span
                               className={`text-[11px] font-semibold mt-0.5 ${
                                 isSelected ? 'text-sky-100' : 'text-sky-700'
@@ -654,11 +684,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={bookingSubmitting || !bookingFecha || !bookingHora}
+                    disabled={bookingSubmitting || !selectedProfesional || !bookingFecha || !bookingHora}
                     className="w-full min-h-[52px] rounded-2xl bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold text-base shadow-md shadow-sky-700/20 active:scale-[0.99] transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     <CalendarPlus className="w-5 h-5" />
-                    <span>{bookingSubmitting ? 'Confirmando...' : 'Confirmar Reserva'}</span>
+                    <span>{bookingSubmitting ? 'Guardando en Supabase...' : 'Confirmar Reserva'}</span>
                   </button>
                 </div>
               </form>
@@ -666,7 +696,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </div>
         )}
 
-        {/* SUBVIEW 2: MIS CITAS MÉDICAS */}
+        {/* SUBVIEW 2: MIS CITAS MÉDICAS (100% Supabase con JOIN a `funcionarios`) */}
         {activeView === 'mis-citas' && (
           <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm animate-in fade-in">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
@@ -685,17 +715,37 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => openReservarView()}
-                className="min-h-[40px] px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 font-bold text-xs hover:bg-sky-100 transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Nueva Hora</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={refreshSupabaseData}
+                  aria-label="Recargar citas"
+                  className="min-h-[40px] min-w-[40px] rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 flex items-center justify-center cursor-pointer"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingData ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openReservarView()}
+                  className="min-h-[40px] px-3 py-1.5 rounded-xl bg-sky-50 text-sky-700 font-bold text-xs hover:bg-sky-100 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Nueva Hora</span>
+                </button>
+              </div>
             </div>
 
-            {misCitas.length === 0 ? (
+            {dataError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
+                {dataError}
+              </div>
+            )}
+
+            {loadingData ? (
+              <div className="py-10 text-center text-slate-500 text-sm font-semibold">
+                Consultando sus citas en Supabase...
+              </div>
+            ) : misCitas.length === 0 ? (
               <div className="py-10 text-center text-slate-500">
                 <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-2" />
                 <p className="font-semibold text-slate-700">No tiene citas agendadas actualmente</p>
@@ -711,7 +761,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               <div className="space-y-3.5">
                 {misCitas.map((cita) => (
                   <button
-                    key={cita.id}
+                    key={cita.cita_id}
                     type="button"
                     onClick={() => {
                       setConfirmingCancelId(null);
@@ -725,7 +775,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="font-extrabold text-slate-900 text-sm sm:text-base leading-snug">
-                        {cita.especialidad}
+                        {cita.tipo_atencion}
                       </span>
                       <span
                         className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md shrink-0 ${getEstadoBadgeStyle(
@@ -736,17 +786,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       </span>
                     </div>
 
-                    {/* Nombre real y completo del doctor */}
+                    {/* Nombre real y completo del doctor desde JOIN funcionarios */}
                     <div className="mt-2 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-sky-800">
                       <Stethoscope className="w-4 h-4 text-sky-600 shrink-0" />
-                      <span>{cita.profesionalNombre}</span>
+                      <span>
+                        {cita.funcionarios?.nombre_completo || `Profesional #${cita.funcionario_id}`}
+                      </span>
                     </div>
 
                     <div className="mt-2 space-y-1 text-xs text-slate-600">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                         <span className="tabular-nums">
-                          {cita.fecha} · <strong>{cita.hora} hrs</strong>
+                          {cita.fecha} · <strong>{cita.hora}</strong>
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -757,7 +809,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
                       <span className="text-slate-500 font-medium truncate">
-                        Paciente: <strong className="text-slate-700">{cita.pacienteNombre}</strong>
+                        Paciente: <strong className="text-slate-700">{cita.paciente_nombre}</strong>
                       </span>
                       <span className="text-sky-700 font-bold flex items-center gap-0.5 shrink-0">
                         Ver detalle
@@ -786,7 +838,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </button>
                 <div>
                   <h2 className="text-lg sm:text-xl font-extrabold text-slate-900">Cargas Familiares</h2>
-                  <p className="text-xs text-slate-500">Gestione la salud de familiares y dependientes</p>
+                  <p className="text-xs text-slate-500">Agregue familiares para reservar horas a su nombre</p>
                 </div>
               </div>
 
@@ -800,36 +852,39 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </button>
             </div>
 
-            <div className="space-y-3">
-              {cargas.map((carga) => (
-                <div
-                  key={carga.id}
-                  className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 flex items-center justify-between gap-3"
-                >
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm sm:text-base">{carga.nombre}</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      RUT: <strong>{carga.rut}</strong> · {carga.parentesco} ({carga.edad} años)
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => openReservarView(carga.id)}
-                    className="min-h-[42px] px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shrink-0 active:scale-95 transition-all cursor-pointer"
+            {cargas.length === 0 ? (
+              <div className="py-8 text-center text-slate-500 text-sm">
+                <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="font-semibold text-slate-700">No tiene cargas familiares agregadas</p>
+                <p className="text-xs mt-1">
+                  Presione &quot;+ Agregar&quot; para inscribir a un adulto mayor o familiar a su cargo.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {cargas.map((carga) => (
+                  <div
+                    key={carga.id}
+                    className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 flex items-center justify-between gap-3"
                   >
-                    Agendar Hora
-                  </button>
-                </div>
-              ))}
-            </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm sm:text-base">{carga.nombre}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        RUT: <strong>{carga.rut}</strong> · {carga.parentesco} ({carga.edad} años)
+                      </p>
+                    </div>
 
-            <div className="mt-5 p-3.5 rounded-2xl bg-sky-50/70 border border-sky-100 text-xs text-sky-900 flex items-start gap-2">
-              <Users className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
-              <span>
-                Las cargas familiares registradas pueden recibir atención en la posta rural bajo su número de contacto ({usuario.celular}).
-              </span>
-            </div>
+                    <button
+                      type="button"
+                      onClick={() => openReservarView(carga.id)}
+                      className="min-h-[42px] px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shrink-0 active:scale-95 transition-all cursor-pointer"
+                    >
+                      Agendar Hora
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -851,50 +906,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </div>
             </div>
 
-            <div className="space-y-3.5">
-              {derivaciones.map((der) => (
-                <div
-                  key={der.id}
-                  className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-bold text-slate-900 text-sm sm:text-base">
-                      {der.especialidad}
-                    </span>
-                    <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0 ${
-                        der.estado === 'Cita Asignada'
-                          ? 'bg-sky-100 text-sky-800'
-                          : 'bg-cyan-100 text-cyan-800'
-                      }`}
-                    >
-                      {der.estado}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 space-y-1 text-xs text-slate-600">
-                    <div className="flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                      <span>{der.hospital}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                      <span>Fecha de ingreso de solicitud: {der.fechaSolicitud}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 pt-2.5 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>Médico que deriva: {der.medicoSolicitante}</span>
-                    <span className="font-semibold text-slate-700">Prioridad: {der.prioridad}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-xs text-sky-950">
-              <p className="font-bold">Información de Traslado Rural:</p>
-              <p className="mt-0.5">
-                Si requiere apoyo de traslado o ambulancia municipal para acudir al hospital provincial, coordine con su posta en {usuario.ciudad}.
+            <div className="py-8 text-center text-slate-500">
+              <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+              <p className="font-bold text-slate-700">No registra derivaciones activas</p>
+              <p className="text-xs mt-1 max-w-xs mx-auto">
+                Cuando un médico de la posta genere una interconsulta a hospital base, aparecerá aquí automáticamente.
               </p>
             </div>
           </div>
@@ -931,7 +947,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 Estado: {selectedCita.estado}
               </span>
               <h3 id="detalle-cita-title" className="text-xl font-extrabold text-slate-900 leading-tight">
-                {selectedCita.especialidad}
+                {selectedCita.tipo_atencion}
               </h3>
             </div>
 
@@ -943,7 +959,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 </span>
                 <p className="font-extrabold text-slate-900 mt-0.5 flex items-center gap-2">
                   <Stethoscope className="w-4 h-4 text-sky-700 shrink-0" />
-                  <span>{selectedCita.profesionalNombre}</span>
+                  <span>
+                    {selectedCita.funcionarios?.nombre_completo ||
+                      `Profesional #${selectedCita.funcionario_id}`}
+                  </span>
                 </p>
               </div>
 
@@ -952,15 +971,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
                   Paciente Atendido
                 </span>
-                <p className="font-bold text-slate-900 mt-0.5">{selectedCita.pacienteNombre}</p>
+                <p className="font-bold text-slate-900 mt-0.5">{selectedCita.paciente_nombre}</p>
                 <p className="text-xs text-slate-600 mt-0.5 tabular-nums">
-                  RUT: <strong>{selectedCita.pacienteRut}</strong>
+                  RUT Titular: <strong>{usuario.rut}</strong>
                 </p>
-                {selectedCita.esCargaFamiliar && selectedCita.agendadoPorNombre && (
-                  <p className="text-xs text-sky-800 font-semibold mt-1">
-                    Agendada por cuidador/titular: {selectedCita.agendadoPorNombre}
-                  </p>
-                )}
               </div>
 
               {/* Fecha y hora */}
@@ -979,7 +993,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   </span>
                   <p className="font-extrabold text-sky-800 mt-0.5 flex items-center gap-1.5 tabular-nums">
                     <Clock className="w-4 h-4 text-sky-600" />
-                    <span>{selectedCita.hora} hrs</span>
+                    <span>{selectedCita.hora}</span>
                   </p>
                 </div>
               </div>
@@ -994,7 +1008,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   <span>{selectedCita.lugar}</span>
                 </p>
                 <p className="text-xs font-semibold text-sky-800 mt-1 ml-5">
-                  {selectedCita.box}
+                  {getBoxPorRol(
+                    selectedCita.funcionarios?.rol || 'Médico',
+                    selectedCita.tipo_atencion
+                  )}
                 </p>
               </div>
 
@@ -1003,23 +1020,24 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <Info className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold text-slate-900 block mb-0.5">Indicaciones previas</span>
-                  <p>{selectedCita.indicaciones}</p>
+                  <p>{getIndicacionesPorEspecialidad(selectedCita.tipo_atencion)}</p>
                 </div>
               </div>
             </div>
 
-            {/* Botón Anular Hora con confirmación inline */}
+            {/* Botón Anular Hora */}
             <div className="mt-6 pt-4 border-t border-slate-100 space-y-2.5">
               {(selectedCita.estado === 'Confirmada' || selectedCita.estado === 'En Espera') && (
                 <>
-                  {confirmingCancelId === selectedCita.id ? (
+                  {confirmingCancelId === selectedCita.cita_id ? (
                     <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 space-y-3">
                       <p className="text-xs font-bold text-rose-900">
-                        ¿Confirma que desea anular esta hora? El cupo quedará inmediatamente libre para otro paciente.
+                        ¿Confirma que desea anular esta hora? El cupo quedará inmediatamente libre en Supabase.
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
+                          disabled={cancelling}
                           onClick={() => setConfirmingCancelId(null)}
                           className="min-h-[42px] rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
                         >
@@ -1027,17 +1045,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleConfirmCancelCita(selectedCita.id)}
-                          className="min-h-[42px] rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer"
+                          disabled={cancelling}
+                          onClick={() => handleConfirmCancelCita(selectedCita.cita_id)}
+                          className="min-h-[42px] rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer disabled:opacity-60"
                         >
-                          Sí, anular hora
+                          {cancelling ? 'Anulando...' : 'Sí, anular hora'}
                         </button>
                       </div>
                     </div>
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setConfirmingCancelId(selectedCita.id)}
+                      onClick={() => setConfirmingCancelId(selectedCita.cita_id)}
                       className="w-full min-h-[48px] rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-sm transition-colors cursor-pointer"
                     >
                       Anular hora

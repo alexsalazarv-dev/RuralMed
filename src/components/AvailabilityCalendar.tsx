@@ -1,16 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
-import { Profesional } from '../lib/clinicData.ts';
+import { CitaDB } from '../lib/supabase.ts';
 import {
-  CitaMedica,
   getDayAvailability,
   toISODateLocal,
   parseISODateLocal,
 } from '../lib/appointmentsService.ts';
 
 interface AvailabilityCalendarProps {
-  profesional: Profesional;
-  citas: CitaMedica[];
+  funcionarioId: number;
+  occupiedCitas: CitaDB[];
   selectedDate: string;
   onSelectDate: (dateStr: string) => void;
 }
@@ -32,8 +31,8 @@ const MONTHS = [
 ];
 
 export const AvailabilityCalendar: React.FC<AvailabilityCalendarProps> = ({
-  profesional,
-  citas,
+  funcionarioId,
+  occupiedCitas,
   selectedDate,
   onSelectDate,
 }) => {
@@ -69,7 +68,6 @@ export const AvailabilityCalendar: React.FC<AvailabilityCalendarProps> = ({
   const calendarDays = useMemo(() => {
     const firstOfMonth = new Date(viewYear, viewMonth, 1);
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-    // Monday = 0 ... Sunday = 6
     const startOffset = (firstOfMonth.getDay() + 6) % 7;
 
     const cells: Array<{
@@ -85,12 +83,12 @@ export const AvailabilityCalendar: React.FC<AvailabilityCalendarProps> = ({
     for (let day = 1; day <= daysInMonth; day++) {
       const dateObj = new Date(viewYear, viewMonth, day);
       const dateStr = toISODateLocal(dateObj);
-      const availability = getDayAvailability(citas, profesional, dateStr);
+      const availability = getDayAvailability(occupiedCitas, funcionarioId, dateStr);
       cells.push({ dateStr, dayNum: day, availability });
     }
 
     return cells;
-  }, [viewYear, viewMonth, citas, profesional]);
+  }, [viewYear, viewMonth, occupiedCitas, funcionarioId]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4">
@@ -173,7 +171,6 @@ export const AvailabilityCalendar: React.FC<AvailabilityCalendarProps> = ({
             );
           }
 
-          // Available day (GREEN)
           return (
             <button
               key={cell.dateStr}

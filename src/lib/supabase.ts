@@ -15,6 +15,7 @@ const getBaseUrl = (url: string) => {
 export const supabase = createClient(getBaseUrl(SUPABASE_URL), SUPABASE_ANON_KEY);
 
 export interface Usuario {
+  usuario_id?: number;
   rut: string;
   nombre: string;
   apellidos: string;
@@ -23,14 +24,42 @@ export interface Usuario {
   celular: string;
   direccion: string;
   ciudad: string;
+  fecha_registro?: string;
+}
+
+export interface FuncionarioDB {
+  funcionario_id: number;
+  rut: string;
+  email: string;
+  password?: string;
+  nombre_completo: string;
+  rol: 'Médico' | 'Kinesiólogo' | 'Administrativo' | string;
+  especialidad: string;
+  activo: boolean;
+  fecha_registro?: string;
+}
+
+export type EstadoCita = 'Confirmada' | 'En Espera' | 'Atendida' | 'Cancelada';
+
+export interface CitaDB {
+  cita_id: number;
+  usuario_id: number;
+  funcionario_id: number;
+  paciente_nombre: string;
+  tipo_atencion: string;
+  fecha: string; // YYYY-MM-DD
+  hora: string; // ej. '09:30 hrs'
+  lugar: string;
+  estado: EstadoCita;
   created_at?: string;
+  funcionarios?: FuncionarioDB | null;
+  usuarios?: Usuario | null;
 }
 
 /**
  * Format Chilean RUT with dots and dash (e.g. 12.345.678-9)
  */
 export function formatRUT(value: string): string {
-  // Clean non-alphanumeric characters
   const clean = value.replace(/[^0-9kK]/g, '').toUpperCase();
   if (clean.length === 0) return '';
   if (clean.length === 1) return clean;
@@ -38,13 +67,12 @@ export function formatRUT(value: string): string {
   const dv = clean.slice(-1);
   const rutBody = clean.slice(0, -1);
 
-  // Add dots to body from right to left
   const formattedBody = rutBody.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `${formattedBody}-${dv}`;
 }
 
 /**
- * Clean RUT to standard raw form without dots (e.g. 12345678-9 or 123456789)
+ * Clean RUT to standard raw form without dots (e.g. 123456789)
  */
 export function cleanRUT(value: string): string {
   return value.replace(/[^0-9kK]/g, '').toUpperCase();

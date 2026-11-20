@@ -1,10 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Funcionario, PROFESIONALES } from '../lib/clinicData.ts';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { FuncionarioDB, CitaDB, EstadoCita } from '../lib/supabase.ts';
 import {
-  CitaMedica,
-  EstadoCita,
-  loadAllCitas,
-  updateAppointmentStatus,
+  fetchAllCitasWithRelations,
+  fetchActiveFuncionarios,
+  updateCitaEstadoInSupabase,
   calculateStatsForRange,
   toISODateLocal,
 } from '../lib/appointmentsService.ts';
@@ -21,10 +20,11 @@ import {
   Stethoscope,
   Filter,
   ClipboardList,
+  RefreshCw,
 } from 'lucide-react';
 
 interface StaffDashboardScreenProps {
-  funcionario: Funcionario;
+  funcionario: FuncionarioDB;
   onLogout: () => void;
 }
 
@@ -88,46 +88,68 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
   onLogout,
 }) => {
   const todayStr = toISODateLocal(new Date());
+  const isAdmin = funcionario.rol === 'Administrativo';
+
   const [activeTab, setActiveTab] = useState<'agenda' | 'reportes'>('agenda');
-  const [allCitas, setAllCitas] = useState<CitaMedica[]>(() => loadAllCitas());
+  const [allCitas, setAllCitas] = useState<CitaDB[]>([]);
+  const [funcionariosActivos, setFuncionariosActivos] = useState<FuncionarioDB[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Filters for Agenda
   const [agendaDate, setAgendaDate] = useState<string>(todayStr);
-  const [showAllDates, setShowAllDates] = useState<boolean>(false);
+  const [showAllDates, setShowAllDates] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<'Todas' | EstadoCita>('Todas');
-  const [selectedProfFilter, setSelectedProfFilter] = useState<string>(
-    funcionario.rol === 'doctor' && funcionario.profesionalId ? funcionario.profesionalId : 'todos'
+  const [selectedFuncFilter, setSelectedFuncFilter] = useState<string>(
+    isAdmin ? 'todos' : String(funcionario.funcionario_id)
   );
-  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   // Filters for Reportes y Estadísticas
   const [reportMode, setReportMode] = useState<'dia' | 'rango'>('dia');
   const [reportStartDate, setReportStartDate] = useState<string>(todayStr);
   const [reportEndDate, setReportEndDate] = useState<string>(todayStr);
 
-  useEffect(() => {
-    const sync = () => setAllCitas(loadAllCitas());
-    window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
+  const loadFromSupabase = useCallback(async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const [citasRes, funcRes] = await Promise.all([
+        fetchAllCitasWithRelations(),
+        fetchActiveFuncionarios(),
+      ]);
+
+      if (citasRes.error) setErrorMsg(citasRes.error);
+      if (funcRes.error) setErrorMsg(funcRes.error);
+
+      setAllCitas(citasRes.data);
+      setFuncionariosActivos(funcRes.data);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Scoped appointments for Agenda tab
-  const filteredAgendaCitas = useMemo(() => {
-    return allCitas
-      .filter((c) => {
-        if (funcionario.rol === 'doctor' && funcionario.profesionalId) {
-          if (c.profesionalId !== funcionario.profesionalId) return false;
-        } else if (selectedProfFilter !== 'todos' && c.profesionalId !== selectedProfFilter) {
-          return false;
-        }
-        if (!showAllDates && agendaDate && c.fecha !== agendaDate) return false;
-        if (statusFilter !== 'Todas' && c.estado !== statusFilter) return false;
-        return true;
-      })
-      .sort((a, b) => `${a.fecha} ${a.hora}`.localeCompare(`${b.fecha} ${b.hora}`));
-  }, [allCitas, funcionario, selectedProfFilter, showAllDates, agendaDate, statusFilter]);
+  useEffect(() => {
+    loadFromSupabase();
+  }, [loadFromSupabase]);
 
-  // Real-time stats for Reportes y Estadísticas tab
+  const filteredAgendaCitas = useMemo(() => {
+    return allCitas.filter((c) => {
+      if (!isAdmin) {
+        if (c.funcionario_id !== funcionario.funcionario_id) return false;
+      } else if (
+        selectedFuncFilter !== 'todos' &&
+        c.funcionario_id !== Number(selectedFuncFilter)
+      ) {
+        return false;
+      }
+      if (!showAllDates && agendaDate && c.fecha !== agendaDate) return false;
+      if (statusFilter !== 'Todas' && c.estado !== statusFilter) return false;
+      return true;
+    });
+  }, [allCitas, isAdmin, funcionario.funcionario_id, selectedFuncFilter, showAllDates, agendaDate, statusFilter]);
+
   const effectiveEndDate =
     reportMode === 'dia'
       ? reportStartDate
@@ -136,20 +158,35 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
       : reportStartDate;
 
   const stats = useMemo(() => {
-    const profScope =
-      funcionario.rol === 'doctor' && funcionario.profesionalId
-        ? funcionario.profesionalId
-        : selectedProfFilter !== 'todos'
-        ? selectedProfFilter
-        : undefined;
+    const funcScope = !isAdmin
+      ? funcionario.funcionario_id
+      : selectedFuncFilter !== 'todos'
+      ? Number(selectedFuncFilter)
+      : undefined;
 
-    return calculateStatsForRange(allCitas, reportStartDate, effectiveEndDate, profScope);
-  }, [allCitas, reportStartDate, effectiveEndDate, funcionario, selectedProfFilter]);
+    return calculateStatsForRange(
+      allCitas,
+      funcionariosActivos,
+      reportStartDate,
+      effectiveEndDate,
+      funcScope
+    );
+  }, [allCitas, funcionariosActivos, reportStartDate, effectiveEndDate, isAdmin, funcionario.funcionario_id, selectedFuncFilter]);
 
-  const handleStatusChange = async (citaId: string, nuevoEstado: EstadoCita) => {
-    const updated = await updateAppointmentStatus(citaId, nuevoEstado);
-    setAllCitas(updated);
-    setConfirmCancelId(null);
+  const handleStatusChange = async (citaId: number, nuevoEstado: EstadoCita) => {
+    setUpdatingId(citaId);
+    setErrorMsg(null);
+    try {
+      const res = await updateCitaEstadoInSupabase(citaId, nuevoEstado);
+      if (!res.success) {
+        setErrorMsg(`Error al actualizar estado en Supabase: ${res.error}`);
+        return;
+      }
+      setConfirmCancelId(null);
+      await loadFromSupabase();
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const getStatusStyle = (estado: EstadoCita) => {
@@ -184,9 +221,11 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
 
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-extrabold text-slate-900 leading-tight">{funcionario.nombre}</p>
+            <p className="text-sm font-extrabold text-slate-900 leading-tight">
+              {funcionario.nombre_completo}
+            </p>
             <p className="text-xs text-slate-500">
-              {funcionario.cargo} · {funcionario.posta}
+              {funcionario.rol} · {funcionario.especialidad}
             </p>
           </div>
           <button
@@ -200,45 +239,61 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
         </div>
       </header>
 
-      {/* Staff Greeting (mobile visible) */}
+      {/* Mobile identity */}
       <div className="mt-5 mb-4 sm:hidden">
-        <p className="text-base font-extrabold text-slate-900">{funcionario.nombre}</p>
-        <p className="text-xs text-slate-500">{funcionario.cargo}</p>
+        <p className="text-base font-extrabold text-slate-900">{funcionario.nombre_completo}</p>
+        <p className="text-xs text-slate-500">{funcionario.especialidad}</p>
       </div>
 
-      {/* Main Section Tabs */}
-      <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-6 mb-6 p-1.5 bg-slate-100 rounded-2xl border border-slate-200/80 w-full sm:w-fit">
-        <button
-          type="button"
-          onClick={() => setActiveTab('agenda')}
-          className={`flex-1 sm:flex-initial min-h-[44px] px-5 py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'agenda'
-              ? 'bg-sky-600 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <ClipboardList className="w-4 h-4 shrink-0" />
-          <span>Agenda de Citas</span>
-        </button>
+      {/* Main Section Tabs + Refresh */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-4 sm:mt-6 mb-6">
+        <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200/80 w-full sm:w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab('agenda')}
+            className={`flex-1 sm:flex-initial min-h-[44px] px-5 py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'agenda'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ClipboardList className="w-4 h-4 shrink-0" />
+            <span>Agenda de Citas</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('reportes')}
+            className={`flex-1 sm:flex-initial min-h-[44px] px-5 py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'reportes'
+                ? 'bg-sky-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 shrink-0" />
+            <span>Reportes y Estadísticas</span>
+          </button>
+        </div>
 
         <button
           type="button"
-          onClick={() => setActiveTab('reportes')}
-          className={`flex-1 sm:flex-initial min-h-[44px] px-5 py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'reportes'
-              ? 'bg-sky-600 text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
+          onClick={loadFromSupabase}
+          className="min-h-[44px] px-4 py-2 rounded-xl bg-white border border-slate-200 hover:bg-sky-50 text-slate-700 hover:text-sky-700 font-bold text-xs flex items-center gap-2 cursor-pointer"
         >
-          <BarChart3 className="w-4 h-4 shrink-0" />
-          <span>Reportes y Estadísticas</span>
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span>Actualizar desde Supabase</span>
         </button>
       </div>
+
+      {errorMsg && (
+        <div className="mb-5 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-semibold">
+          {errorMsg}
+        </div>
+      )}
 
       {/* TAB 1: AGENDA DE CITAS */}
       {activeTab === 'agenda' && (
         <div className="space-y-5 animate-in fade-in">
-          {/* Filters Card */}
           <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
               <Filter className="w-4 h-4 text-sky-600" />
@@ -246,7 +301,6 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              {/* Fecha */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Fecha</label>
                 <input
@@ -267,7 +321,6 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                 </label>
               </div>
 
-              {/* Estado */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Estado de la Cita</label>
                 <select
@@ -283,21 +336,20 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                 </select>
               </div>
 
-              {/* Profesional (visible para Administrador) */}
-              {funcionario.rol === 'admin' && (
+              {isAdmin && (
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-600 mb-1">
                     Profesional de la Posta
                   </label>
                   <select
-                    value={selectedProfFilter}
-                    onChange={(e) => setSelectedProfFilter(e.target.value)}
+                    value={selectedFuncFilter}
+                    onChange={(e) => setSelectedFuncFilter(e.target.value)}
                     className="w-full min-h-[44px] px-3 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold bg-white"
                   >
-                    <option value="todos">Todos los profesionales ({PROFESIONALES.length})</option>
-                    {PROFESIONALES.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre} — {p.titulo}
+                    <option value="todos">Todos los profesionales ({funcionariosActivos.length})</option>
+                    {funcionariosActivos.map((p) => (
+                      <option key={p.funcionario_id} value={String(p.funcionario_id)}>
+                        {p.nombre_completo} — {p.especialidad}
                       </option>
                     ))}
                   </select>
@@ -306,7 +358,6 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
             </div>
           </div>
 
-          {/* Appointments List */}
           <div className="space-y-3.5">
             <div className="flex items-center justify-between px-1">
               <h2 className="text-base font-extrabold text-slate-900">
@@ -319,12 +370,16 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               )}
             </div>
 
-            {filteredAgendaCitas.length === 0 ? (
+            {loading ? (
+              <div className="p-10 rounded-3xl bg-white border border-slate-200 text-center text-slate-500 text-sm font-semibold">
+                Cargando citas desde Supabase...
+              </div>
+            ) : filteredAgendaCitas.length === 0 ? (
               <div className="p-10 rounded-3xl bg-white border border-slate-200 text-center text-slate-500">
                 <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                 <p className="font-bold text-slate-700">No hay citas registradas para este filtro</p>
                 <p className="text-xs mt-1">
-                  Pruebe seleccionando otra fecha o activando &quot;Mostrar todas las fechas&quot;.
+                  Cuando los pacientes reserven horas aparecerán aquí en tiempo real.
                 </p>
               </div>
             ) : (
@@ -333,14 +388,14 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
 
                 return (
                   <div
-                    key={cita.id}
+                    key={cita.cita_id}
                     className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4"
                   >
                     <div className="space-y-2 min-w-0">
                       <div className="flex flex-wrap items-center gap-2.5">
                         <span className="inline-flex items-center gap-1.5 text-sm font-extrabold text-sky-800 bg-sky-50 px-3 py-1 rounded-xl border border-sky-200 tabular-nums">
                           <Clock className="w-4 h-4 text-sky-600" />
-                          {cita.fecha} · {cita.hora} hrs
+                          {cita.fecha} · {cita.hora}
                         </span>
                         <span
                           className={`text-xs font-bold px-2.5 py-1 rounded-lg ${getStatusStyle(
@@ -354,38 +409,42 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                       <div>
                         <h3 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
                           <User className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span>{cita.pacienteNombre}</span>
+                          <span>{cita.paciente_nombre}</span>
                         </h3>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-600 mt-1">
-                          <span className="tabular-nums">
-                            RUT: <strong className="text-slate-800">{cita.pacienteRut}</strong>
-                          </span>
-                          <span className="inline-flex items-center gap-1 tabular-nums">
-                            <Phone className="w-3.5 h-3.5 text-sky-600" />
-                            <strong>{cita.pacienteTelefono}</strong>
-                          </span>
+                          {cita.usuarios?.rut && (
+                            <span className="tabular-nums">
+                              RUT: <strong className="text-slate-800">{cita.usuarios.rut}</strong>
+                            </span>
+                          )}
+                          {cita.usuarios?.celular && (
+                            <span className="inline-flex items-center gap-1 tabular-nums">
+                              <Phone className="w-3.5 h-3.5 text-sky-600" />
+                              <strong>{cita.usuarios.celular}</strong>
+                            </span>
+                          )}
                         </div>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 pt-1">
-                        <span className="font-bold text-slate-800">{cita.especialidad}</span>
+                        <span className="font-bold text-slate-800">{cita.tipo_atencion}</span>
                         <span aria-hidden="true">·</span>
                         <span className="inline-flex items-center gap-1 text-sky-800 font-semibold">
                           <Stethoscope className="w-3.5 h-3.5" />
-                          {cita.profesionalNombre}
+                          {cita.funcionarios?.nombre_completo || `Profesional #${cita.funcionario_id}`}
                         </span>
                       </div>
                     </div>
 
-                    {/* Staff Actions */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
                       {isActive ? (
-                        confirmCancelId === cita.id ? (
+                        confirmCancelId === cita.cita_id ? (
                           <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 flex items-center gap-2">
                             <span className="text-xs font-bold text-rose-900">¿Cancelar y liberar cupo?</span>
                             <button
                               type="button"
-                              onClick={() => handleStatusChange(cita.id, 'Cancelada')}
+                              disabled={updatingId === cita.cita_id}
+                              onClick={() => handleStatusChange(cita.cita_id, 'Cancelada')}
                               className="min-h-[38px] px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
                             >
                               Sí
@@ -402,16 +461,18 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                           <>
                             <button
                               type="button"
-                              onClick={() => handleStatusChange(cita.id, 'Atendida')}
-                              className="min-h-[44px] px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                              disabled={updatingId === cita.cita_id}
+                              onClick={() => handleStatusChange(cita.cita_id, 'Atendida')}
+                              className="min-h-[44px] px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-60"
                             >
                               <CheckCircle2 className="w-4 h-4" />
                               <span>Marcar Atendida</span>
                             </button>
                             <button
                               type="button"
-                              onClick={() => setConfirmCancelId(cita.id)}
-                              className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                              disabled={updatingId === cita.cita_id}
+                              onClick={() => setConfirmCancelId(cita.cita_id)}
+                              className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
                             >
                               <XCircle className="w-4 h-4" />
                               <span>Cancelar Cita</span>
@@ -437,13 +498,12 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
       {/* TAB 2: REPORTES Y ESTADÍSTICAS */}
       {activeTab === 'reportes' && (
         <div className="space-y-6 animate-in fade-in">
-          {/* Date Filter Controls */}
           <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-extrabold text-slate-900">Reportes y Estadísticas</h2>
                 <p className="text-xs text-slate-500">
-                  Métricas calculadas en tiempo real desde la base de datos de citas
+                  Métricas calculadas en tiempo real desde la tabla citas de Supabase
                 </p>
               </div>
 
@@ -507,18 +567,18 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
                 </div>
               )}
 
-              {funcionario.rol === 'admin' && (
+              {isAdmin && (
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Profesional</label>
                   <select
-                    value={selectedProfFilter}
-                    onChange={(e) => setSelectedProfFilter(e.target.value)}
+                    value={selectedFuncFilter}
+                    onChange={(e) => setSelectedFuncFilter(e.target.value)}
                     className="w-full min-h-[44px] px-3 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold bg-white"
                   >
                     <option value="todos">Toda la Posta</option>
-                    {PROFESIONALES.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombre}
+                    {funcionariosActivos.map((p) => (
+                      <option key={p.funcionario_id} value={String(p.funcionario_id)}>
+                        {p.nombre_completo}
                       </option>
                     ))}
                   </select>
@@ -527,7 +587,6 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
             </div>
           </div>
 
-          {/* 4 KPI Counter Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs">
               <span className="text-xs font-bold text-slate-500 block">Total Citas Agendadas</span>
@@ -570,7 +629,6 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
             </div>
           </div>
 
-          {/* Visual Gauges: Asistencia & Ocupación */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <CircularGauge
               percentage={stats.porcentajeAsistencia}
@@ -585,64 +643,6 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               sublabel={`${stats.cuposTomados} cupos ocupados de ${stats.cuposTotales} cupos totales`}
               accentClass="text-cyan-600"
             />
-          </div>
-
-          {/* Horizontal Breakdown Bar */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4">
-            <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
-              Distribución de la Jornada
-            </h3>
-
-            <div className="space-y-3">
-              {[
-                {
-                  label: 'Atendidas',
-                  count: stats.totalAtendidas,
-                  total: Math.max(1, stats.totalAgendadas),
-                  barClass: 'bg-sky-600',
-                },
-                {
-                  label: 'Pendientes (Confirmadas / En Espera)',
-                  count: stats.totalPendientes,
-                  total: Math.max(1, stats.totalAgendadas),
-                  barClass: 'bg-cyan-500',
-                },
-                {
-                  label: 'Canceladas',
-                  count: stats.totalCanceladas,
-                  total: Math.max(1, stats.totalAgendadas),
-                  barClass: 'bg-rose-400',
-                },
-                {
-                  label: 'Cupos Libres',
-                  count: stats.cuposLibres,
-                  total: Math.max(1, stats.cuposTotales),
-                  barClass: 'bg-sky-300',
-                },
-              ].map((row) => {
-                const pct = Math.round((row.count / row.total) * 100);
-                return (
-                  <div key={row.label} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                      <span>{row.label}</span>
-                      <span className="tabular-nums">
-                        {row.count} ({stats.totalAgendadas === 0 && row.label !== 'Cupos Libres' ? 0 : pct}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${row.barClass} transition-all duration-500`}
-                        style={{
-                          width: `${
-                            stats.totalAgendadas === 0 && row.label !== 'Cupos Libres' ? 0 : pct
-                          }%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
       )}

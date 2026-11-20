@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { supabase, formatRUT, Usuario } from '../lib/supabase.ts';
-import { Funcionario, FUNCIONARIOS_PRUEBA } from '../lib/clinicData.ts';
-import { fetchFuncionarios } from '../lib/adminService.ts';
+import { supabase, formatRUT, Usuario, FuncionarioDB } from '../lib/supabase.ts';
 import { RURALMED_LOGO_URL } from './Header.tsx';
 import {
   LogIn,
@@ -20,8 +18,8 @@ import {
 
 interface LoginScreenProps {
   onLoginSuccess: (usuario: Usuario) => void;
-  onStaffLoginSuccess: (funcionario: Funcionario) => void;
-  onAdminLoginSuccess: (admin: Funcionario) => void;
+  onStaffLoginSuccess: (funcionario: FuncionarioDB) => void;
+  onAdminLoginSuccess: (admin: FuncionarioDB) => void;
   onGoToRegister: () => void;
   initialMessage?: string | null;
   heroImage?: string;
@@ -56,10 +54,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setStaffPassword('');
   };
 
-  // Handle RUT input formatting for patient
   const handleRutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    const formatted = formatRUT(raw);
+    const formatted = formatRUT(e.target.value);
     setRut(formatted);
     if (errorMessage) setErrorMessage(null);
   };
@@ -104,27 +100,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       }
 
       if (error) {
-        console.error('Error al consultar usuarios en Supabase:', error);
         setErrorMessage(`Error de conexión con la base de datos (${error.message || 'Intente nuevamente'}).`);
         return;
       }
 
       if (data && data.length > 0) {
-        const usuarioEncontrado = data[0] as Usuario;
-        onLoginSuccess(usuarioEncontrado);
+        onLoginSuccess(data[0] as Usuario);
       } else {
         setErrorMessage(
           'No se encontró ningún usuario con ese RUT y Celular. Por favor verifique los datos o presione "Registrar / Nuevo Usuario".'
         );
       }
-    } catch (err: unknown) {
-      console.error('Excepción al conectar con Supabase:', err);
+    } catch {
       setErrorMessage('No fue posible conectar con el servidor médico. Verifique su conexión a internet.');
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * Authenticates Funcionario or Administrativo directly against Supabase `funcionarios` table
+   */
   const handleInstitutionalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const idTrimmed = staffIdentifier.trim();
@@ -139,74 +135,50 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setErrorMessage(null);
 
     try {
-      const normalizedInput = idTrimmed.toLowerCase();
-      const normalizedRutInput = idTrimmed.replace(/\./g, '').toUpperCase();
+      const normalizedEmail = idTrimmed.toLowerCase();
+      const normalizedRutNoDots = idTrimmed.replace(/\./g, '').toUpperCase();
 
-      // 1. Check Supabase + Admin-managed funcionarios
-      const allStaff = await fetchFuncionarios();
-      const matchedManaged = allStaff.find((f) => {
-        const emailMatch = f.email.toLowerCase() === normalizedInput;
-        const rutMatch = f.rut.replace(/\./g, '').toUpperCase() === normalizedRutInput;
-        return (emailMatch || rutMatch) && f.password === passTrimmed;
-      });
+      const { data, error } = await supabase
+        .from('funcionarios')
+        .select('*')
+        .eq('activo', true)
+        .eq('password', passTrimmed);
 
-      let resolvedUser: Funcionario | null = null;
-
-      if (matchedManaged) {
-        resolvedUser = {
-          id: matchedManaged.id,
-          rut: matchedManaged.rut,
-          email: matchedManaged.email,
-          password: '',
-          nombre: matchedManaged.nombre,
-          cargo:
-            matchedManaged.rol === 'Administrativo'
-              ? 'Administrativo de Posta Rural'
-              : matchedManaged.especialidad,
-          rol: matchedManaged.rol === 'Administrativo' ? 'admin' : 'doctor',
-          profesionalId: matchedManaged.profesionalId,
-          posta: 'Posta de Salud Rural',
-        };
-      } else {
-        const matchedSeed = FUNCIONARIOS_PRUEBA.find((f) => {
-          const emailMatch = f.email.toLowerCase() === normalizedInput;
-          const rutMatch = f.rut.replace(/\./g, '').toUpperCase() === normalizedRutInput;
-          return (emailMatch || rutMatch) && f.password === passTrimmed;
-        });
-        if (matchedSeed) resolvedUser = matchedSeed;
+      if (error) {
+        setErrorMessage(`Error al validar credenciales en Supabase: ${error.message}`);
+        return;
       }
 
-      if (!resolvedUser) {
+      const matched = ((data || []) as FuncionarioDB[]).find((f) => {
+        const dbEmail = (f.email || '').trim().toLowerCase();
+        const dbRutNoDots = (f.rut || '').replace(/\./g, '').toUpperCase();
+        return dbEmail === normalizedEmail || dbRutNoDots === normalizedRutNoDots;
+      });
+
+      if (!matched) {
         setErrorMessage(
-          'Credenciales institucionales incorrectas. Verifique su RUT/correo y contraseña o utilice la cuenta de prueba.'
+          'Credenciales incorrectas o cuenta inactiva. Verifique su RUT/correo y contraseña en la tabla funcionarios.'
         );
         return;
       }
 
       if (loginRole === 'administrativo') {
-        if (resolvedUser.rol !== 'admin') {
+        if (matched.rol !== 'Administrativo') {
           setErrorMessage(
             'Esta cuenta corresponde a un profesional de salud. Para el Panel Administrativo ingrese con un usuario de rol Administrativo.'
           );
           return;
         }
-        onAdminLoginSuccess(resolvedUser);
+        onAdminLoginSuccess(matched);
       } else {
-        onStaffLoginSuccess(resolvedUser);
+        onStaffLoginSuccess(matched);
       }
+    } catch {
+      setErrorMessage('No fue posible conectar con Supabase. Verifique su conexión a internet.');
     } finally {
       setLoading(false);
     }
   };
-
-  const applyTestAccount = (account: Funcionario) => {
-    setStaffIdentifier(account.email);
-    setStaffPassword(account.password);
-    setErrorMessage(null);
-  };
-
-  const doctorTestAccounts = FUNCIONARIOS_PRUEBA.filter((f) => f.rol === 'doctor');
-  const adminTestAccounts = FUNCIONARIOS_PRUEBA.filter((f) => f.rol === 'admin');
 
   return (
     <div className="w-full max-w-lg mx-auto py-8 sm:py-12 px-4 sm:px-6 flex flex-col items-center justify-center">
@@ -232,7 +204,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
       {/* Main Clean Form Card */}
       <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50 p-5 sm:p-8">
-        {/* 3 Access Tabs: Paciente / Funcionario / Administrativo */}
+        {/* 3 Access Tabs: Paciente / Funcionario / Admin */}
         <div className="grid grid-cols-3 gap-1 p-1.5 bg-slate-100 rounded-2xl mb-6 border border-slate-200/70">
           <button
             type="button"
@@ -427,8 +399,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   }}
                   placeholder={
                     loginRole === 'administrativo'
-                      ? 'Ej: admin@ruralmed.cl o 16.890.432-1'
-                      : 'Ej: alejandro.morales@ruralmed.cl o 14.520.890-3'
+                      ? 'Ej: admin.posta@ruralmed.cl o 44444444-4'
+                      : 'Ej: camila.soto@ruralmed.cl o 22222222-2'
                   }
                   className="w-full min-h-[52px] pl-11 pr-4 rounded-xl border-2 border-slate-300 text-slate-900 text-base font-medium focus:border-sky-600 focus:ring-2 focus:ring-sky-200 transition-colors placeholder:text-slate-400 bg-white"
                   autoComplete="username"
@@ -474,7 +446,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 disabled={loading}
                 className="w-full min-h-[54px] rounded-2xl bg-sky-700 hover:bg-sky-800 text-white font-bold text-base sm:text-lg shadow-lg shadow-sky-800/20 active:scale-[0.99] transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
               >
-                {loginRole === 'administrativo' ? (
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Verificando...</span>
+                  </>
+                ) : loginRole === 'administrativo' ? (
                   <>
                     <ShieldCheck className="w-5 h-5 stroke-[2.3]" />
                     <span>Ingresar al Panel Administrativo</span>
@@ -486,35 +463,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   </>
                 )}
               </button>
-            </div>
-
-            {/* Test Credentials Helper scoped to selected tab */}
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <p className="text-xs font-bold text-slate-600 mb-2.5">
-                Cuenta de acceso rápido para pruebas:
-              </p>
-              <div className="space-y-2">
-                {(loginRole === 'administrativo' ? adminTestAccounts : doctorTestAccounts).map((acc) => (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    onClick={() => applyTestAccount(acc)}
-                    className="w-full text-left p-3 rounded-xl bg-sky-50/70 hover:bg-sky-100/70 border border-sky-200/80 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs sm:text-sm font-bold text-sky-950">
-                        {acc.nombre}
-                      </span>
-                      <span className="text-[11px] font-semibold text-sky-700">
-                        {acc.rol === 'admin' ? 'Administrativo' : 'Médico'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-600 mt-0.5 font-mono">
-                      {acc.email} · Clave: {acc.password}
-                    </p>
-                  </button>
-                ))}
-              </div>
             </div>
           </form>
         )}

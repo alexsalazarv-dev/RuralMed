@@ -1,11 +1,11 @@
 import React from 'react';
-import { Funcionario } from '../lib/clinicData.ts';
+import { FuncionarioDB } from '../lib/supabase.ts';
 import { AdminPanel } from './AdminPanel.tsx';
 import { RURALMED_LOGO_URL } from './Header.tsx';
 import { LogOut, ShieldCheck } from 'lucide-react';
 
 interface AdminDashboardScreenProps {
-  admin: Funcionario;
+  admin: FuncionarioDB;
   onLogout: () => void;
 }
 
@@ -33,9 +33,11 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
 
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-extrabold text-slate-900 leading-tight">{admin.nombre}</p>
+            <p className="text-sm font-extrabold text-slate-900 leading-tight">
+              {admin.nombre_completo}
+            </p>
             <p className="text-xs text-slate-500">
-              {admin.cargo} · {admin.posta}
+              {admin.rol} · {admin.especialidad}
             </p>
           </div>
           <button
@@ -51,8 +53,8 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
 
       {/* Mobile Admin Identity */}
       <div className="mt-4 mb-2 sm:hidden">
-        <p className="text-base font-extrabold text-slate-900">{admin.nombre}</p>
-        <p className="text-xs text-slate-500">{admin.cargo}</p>
+        <p className="text-base font-extrabold text-slate-900">{admin.nombre_completo}</p>
+        <p className="text-xs text-slate-500">{admin.rol}</p>
       </div>
 
       {/* Main Admin Panel Content */}

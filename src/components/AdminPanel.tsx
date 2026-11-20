@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Usuario, formatRUT } from '../lib/supabase.ts';
+import { Usuario, FuncionarioDB, formatRUT } from '../lib/supabase.ts';
 import {
-  FuncionarioRecord,
   RolFuncionario,
   ESPECIALIDADES_FUNCIONARIO,
-  fetchFuncionarios,
+  fetchAllFuncionarios,
   createFuncionario,
   deleteFuncionario,
   fetchPacientes,
@@ -35,8 +34,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
   const [subTab, setSubTab] = useState<'funcionarios' | 'pacientes'>('funcionarios');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Data states
-  const [funcionarios, setFuncionarios] = useState<FuncionarioRecord[]>([]);
+  // Data states directly from Supabase
+  const [funcionarios, setFuncionarios] = useState<FuncionarioDB[]>([]);
   const [pacientes, setPacientes] = useState<Usuario[]>([]);
   const [loadingFunc, setLoadingFunc] = useState(true);
   const [loadingPac, setLoadingPac] = useState(true);
@@ -51,14 +50,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
   const [submitting, setSubmitting] = useState(false);
 
   // Modals: Delete confirmation
-  const [funcToDelete, setFuncToDelete] = useState<FuncionarioRecord | null>(null);
+  const [funcToDelete, setFuncToDelete] = useState<FuncionarioDB | null>(null);
   const [pacToDelete, setPacToDelete] = useState<Usuario | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Form state: New Doctor / Funcionario
   const [funcForm, setFuncForm] = useState({
     rut: '',
-    nombre: '',
+    nombre_completo: '',
     email: '',
     password: '',
     rol: 'Médico' as RolFuncionario,
@@ -86,8 +85,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
 
   const loadFuncionariosList = async () => {
     setLoadingFunc(true);
-    const list = await fetchFuncionarios();
-    setFuncionarios(list);
+    const res = await fetchAllFuncionarios();
+    if (res.error) {
+      showNotification('error', `Error al cargar funcionarios: ${res.error}`);
+    }
+    setFuncionarios(res.data);
     setLoadingFunc(false);
   };
 
@@ -106,7 +108,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
     loadPacientesList();
   }, []);
 
-  // Filtered lists by RUT or Nombre
   const filteredFuncionarios = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const qClean = q.replace(/\./g, '');
@@ -114,7 +115,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
     return funcionarios.filter((f) => {
       const rutClean = f.rut.replace(/\./g, '').toLowerCase();
       return (
-        f.nombre.toLowerCase().includes(q) ||
+        f.nombre_completo.toLowerCase().includes(q) ||
         f.rut.toLowerCase().includes(q) ||
         rutClean.includes(qClean) ||
         f.email.toLowerCase().includes(q)
@@ -138,7 +139,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
     });
   }, [pacientes, searchQuery]);
 
-  // Handlers: Add Doctor / Funcionario
   const handleAddFuncionarioSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setModalError(null);
@@ -147,7 +147,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
     try {
       const res = await createFuncionario({
         rut: funcForm.rut.trim(),
-        nombre: funcForm.nombre.trim(),
+        nombre_completo: funcForm.nombre_completo.trim(),
         email: funcForm.email.trim().toLowerCase(),
         password: funcForm.password.trim(),
         rol: funcForm.rol,
@@ -164,7 +164,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
       setShowAddFuncModal(false);
       setFuncForm({
         rut: '',
-        nombre: '',
+        nombre_completo: '',
         email: '',
         password: '',
         rol: 'Médico',
@@ -181,12 +181,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
     }
   };
 
-  // Handler: Confirm Delete Funcionario
   const handleConfirmDeleteFunc = async () => {
     if (!funcToDelete) return;
     setDeleting(true);
     try {
-      const res = await deleteFuncionario(funcToDelete);
+      const res = await deleteFuncionario(funcToDelete.funcionario_id);
       if (res.success) {
         await loadFuncionariosList();
         onDataChanged?.();
@@ -200,7 +199,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
     }
   };
 
-  // Handlers: Add Paciente
   const handleAddPacienteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setModalError(null);
@@ -241,7 +239,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
     }
   };
 
-  // Handler: Confirm Delete Paciente
   const handleConfirmDeletePac = async () => {
     if (!pacToDelete) return;
     setDeleting(true);
@@ -294,7 +291,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
       {/* Top Bar: Sub-tabs + Quick Search */}
       <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Sub-navigation Tabs */}
           <div className="grid grid-cols-2 sm:inline-flex gap-1.5 p-1.5 bg-slate-100 rounded-2xl border border-slate-200/80">
             <button
               type="button"
@@ -323,7 +319,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
             </button>
           </div>
 
-          {/* Primary Create Button (Green) */}
           {subTab === 'funcionarios' ? (
             <button
               type="button"
@@ -396,7 +391,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
           {loadingFunc ? (
             <div className="p-10 text-center text-slate-500 text-sm font-semibold">
-              Cargando profesionales y funcionarios...
+              Cargando profesionales y funcionarios desde Supabase...
             </div>
           ) : filteredFuncionarios.length === 0 ? (
             <div className="p-10 text-center text-slate-500">
@@ -421,8 +416,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
                     {filteredFuncionarios.map((f) => (
-                      <tr key={f.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-4 px-5 font-bold text-slate-900">{f.nombre}</td>
+                      <tr key={f.funcionario_id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-4 px-5 font-bold text-slate-900">{f.nombre_completo}</td>
                         <td className="py-4 px-4 font-medium text-slate-700 tabular-nums whitespace-nowrap">
                           {f.rut}
                         </td>
@@ -450,10 +445,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
               {/* Mobile Cards */}
               <div className="md:hidden divide-y divide-slate-100">
                 {filteredFuncionarios.map((f) => (
-                  <div key={f.id} className="p-4 space-y-2.5">
+                  <div key={f.funcionario_id} className="p-4 space-y-2.5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="font-extrabold text-slate-900 text-base">{f.nombre}</h3>
+                        <h3 className="font-extrabold text-slate-900 text-base">{f.nombre_completo}</h3>
                         <p className="text-xs font-semibold text-sky-700 mt-0.5">
                           {f.rol} · {f.especialidad}
                         </p>
@@ -610,7 +605,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
               Agregar Doctor / Funcionario
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              El registro quedará habilitado para gestión y reserva de horas médicas.
+              El registro se guardará directamente en la tabla funcionarios de Supabase.
             </p>
 
             {modalError && (
@@ -652,7 +647,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
                           nextRol === 'Kinesiólogo'
                             ? 'Kinesiología'
                             : nextRol === 'Administrativo'
-                            ? 'Gestión y Administración de Posta'
+                            ? 'Ronda Médica General'
                             : 'Médico General / Consulta',
                       }));
                     }}
@@ -673,8 +668,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
                   type="text"
                   required
                   placeholder="Ej: Dra. Sofía Valdés Contreras"
-                  value={funcForm.nombre}
-                  onChange={(e) => setFuncForm((p) => ({ ...p, nombre: e.target.value }))}
+                  value={funcForm.nombre_completo}
+                  onChange={(e) => setFuncForm((p) => ({ ...p, nombre_completo: e.target.value }))}
                   className="w-full min-h-[46px] px-3.5 rounded-xl border border-slate-300 text-slate-900 font-medium focus:border-sky-600"
                 />
               </div>
@@ -935,7 +930,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onDataChanged }) => {
                   ¿Seguro que deseas eliminar este profesional? También se eliminarán sus citas asociadas.
                 </p>
                 <p className="text-xs font-bold text-slate-800 mt-2">
-                  {funcToDelete.nombre} ({funcToDelete.rut})
+                  {funcToDelete.nombre_completo} ({funcToDelete.rut})
                 </p>
               </div>
             </div>

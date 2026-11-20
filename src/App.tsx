@@ -11,19 +11,15 @@ import { DashboardScreen } from './components/DashboardScreen.tsx';
 import { StaffDashboardScreen } from './components/StaffDashboardScreen.tsx';
 import { AdminDashboardScreen } from './components/AdminDashboardScreen.tsx';
 import { EmergencyModal } from './components/EmergencyModal.tsx';
-import { Usuario } from './lib/supabase.ts';
-import { Funcionario } from './lib/clinicData.ts';
-
-// Generated authentic rural health photography
-const HERO_IMAGE_URL = '/src/assets/images/rural_clinic_hero_1793967420159.jpg';
+import { Usuario, FuncionarioDB } from './lib/supabase.ts';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<
     'login' | 'register' | 'dashboard' | 'staff-dashboard' | 'admin-dashboard'
   >('login');
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
-  const [currentStaff, setCurrentStaff] = useState<Funcionario | null>(null);
-  const [currentAdmin, setCurrentAdmin] = useState<Funcionario | null>(null);
+  const [currentStaff, setCurrentStaff] = useState<FuncionarioDB | null>(null);
+  const [currentAdmin, setCurrentAdmin] = useState<FuncionarioDB | null>(null);
   const [fontSize, setFontSize] = useState<'normal' | 'large' | 'xl'>('normal');
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
   const [initialLoginMessage, setInitialLoginMessage] = useState<string | null>(null);
@@ -31,27 +27,33 @@ export default function App() {
   // Restore active session from sessionStorage
   useEffect(() => {
     try {
-      const savedAdmin = sessionStorage.getItem('ruralmed_admin');
+      const savedAdmin = sessionStorage.getItem('ruralmed_admin_db');
       if (savedAdmin) {
-        const parsedAdmin = JSON.parse(savedAdmin) as Funcionario;
-        setCurrentAdmin(parsedAdmin);
-        setCurrentScreen('admin-dashboard');
-        return;
+        const parsedAdmin = JSON.parse(savedAdmin) as FuncionarioDB;
+        if (parsedAdmin.funcionario_id) {
+          setCurrentAdmin(parsedAdmin);
+          setCurrentScreen('admin-dashboard');
+          return;
+        }
       }
 
-      const savedStaff = sessionStorage.getItem('ruralmed_staff');
+      const savedStaff = sessionStorage.getItem('ruralmed_staff_db');
       if (savedStaff) {
-        const parsedStaff = JSON.parse(savedStaff) as Funcionario;
-        setCurrentStaff(parsedStaff);
-        setCurrentScreen('staff-dashboard');
-        return;
+        const parsedStaff = JSON.parse(savedStaff) as FuncionarioDB;
+        if (parsedStaff.funcionario_id) {
+          setCurrentStaff(parsedStaff);
+          setCurrentScreen('staff-dashboard');
+          return;
+        }
       }
 
       const savedUser = sessionStorage.getItem('ruralmed_user');
       if (savedUser) {
         const parsed = JSON.parse(savedUser) as Usuario;
-        setCurrentUser(parsed);
-        setCurrentScreen('dashboard');
+        if (parsed.usuario_id) {
+          setCurrentUser(parsed);
+          setCurrentScreen('dashboard');
+        }
       }
     } catch (e) {
       console.warn('No active session in sessionStorage', e);
@@ -63,8 +65,8 @@ export default function App() {
     setCurrentStaff(null);
     setCurrentAdmin(null);
     try {
-      sessionStorage.removeItem('ruralmed_staff');
-      sessionStorage.removeItem('ruralmed_admin');
+      sessionStorage.removeItem('ruralmed_staff_db');
+      sessionStorage.removeItem('ruralmed_admin_db');
       sessionStorage.setItem('ruralmed_user', JSON.stringify(usuario));
     } catch {
       // ignore
@@ -72,28 +74,28 @@ export default function App() {
     setCurrentScreen('dashboard');
   };
 
-  const handleStaffLoginSuccess = (funcionario: Funcionario) => {
+  const handleStaffLoginSuccess = (funcionario: FuncionarioDB) => {
     setCurrentStaff(funcionario);
     setCurrentUser(null);
     setCurrentAdmin(null);
     try {
       sessionStorage.removeItem('ruralmed_user');
-      sessionStorage.removeItem('ruralmed_admin');
-      sessionStorage.setItem('ruralmed_staff', JSON.stringify(funcionario));
+      sessionStorage.removeItem('ruralmed_admin_db');
+      sessionStorage.setItem('ruralmed_staff_db', JSON.stringify(funcionario));
     } catch {
       // ignore
     }
     setCurrentScreen('staff-dashboard');
   };
 
-  const handleAdminLoginSuccess = (admin: Funcionario) => {
+  const handleAdminLoginSuccess = (admin: FuncionarioDB) => {
     setCurrentAdmin(admin);
     setCurrentUser(null);
     setCurrentStaff(null);
     try {
       sessionStorage.removeItem('ruralmed_user');
-      sessionStorage.removeItem('ruralmed_staff');
-      sessionStorage.setItem('ruralmed_admin', JSON.stringify(admin));
+      sessionStorage.removeItem('ruralmed_staff_db');
+      sessionStorage.setItem('ruralmed_admin_db', JSON.stringify(admin));
     } catch {
       // ignore
     }
@@ -110,8 +112,8 @@ export default function App() {
   const handleLogout = () => {
     try {
       sessionStorage.removeItem('ruralmed_user');
-      sessionStorage.removeItem('ruralmed_staff');
-      sessionStorage.removeItem('ruralmed_admin');
+      sessionStorage.removeItem('ruralmed_staff_db');
+      sessionStorage.removeItem('ruralmed_admin_db');
     } catch {
       // ignore
     }
@@ -160,7 +162,6 @@ export default function App() {
               setCurrentScreen('register');
             }}
             initialMessage={initialLoginMessage}
-            heroImage={HERO_IMAGE_URL}
           />
         )}
 
