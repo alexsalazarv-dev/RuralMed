@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase, formatRUT, Usuario, FuncionarioDB } from '../lib/supabase.ts';
+import { fetchActiveFuncionarios } from '../lib/appointmentsService.ts';
 import { RURALMED_LOGO_URL } from './Header.tsx';
 import {
   LogIn,
@@ -14,6 +15,7 @@ import {
   User,
   Lock,
   Mail,
+  KeyRound,
 } from 'lucide-react';
 
 interface LoginScreenProps {
@@ -46,6 +48,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Active staff directory fetched directly from Supabase `funcionarios`
+  const [funcionariosList, setFuncionariosList] = useState<FuncionarioDB[]>([]);
+  const [loadingFuncionarios, setLoadingFuncionarios] = useState(false);
+
+  useEffect(() => {
+    if (loginRole !== 'funcionario') return;
+    let active = true;
+    const loadStaffList = async () => {
+      setLoadingFuncionarios(true);
+      const { data } = await fetchActiveFuncionarios();
+      if (active) {
+        setFuncionariosList(data);
+        setLoadingFuncionarios(false);
+      }
+    };
+    loadStaffList();
+    return () => {
+      active = false;
+    };
+  }, [loginRole]);
 
   const handleRoleChange = (role: 'paciente' | 'funcionario' | 'administrativo') => {
     setLoginRole(role);
@@ -464,6 +487,61 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 )}
               </button>
             </div>
+
+            {loginRole === 'funcionario' && (
+              <div className="mt-5 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Funcionarios y claves de acceso</span>
+                  </p>
+                  <span className="text-[11px] font-semibold text-sky-700">
+                    Toque para autocompletar
+                  </span>
+                </div>
+
+                {loadingFuncionarios ? (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 text-center">
+                    Cargando funcionarios desde Supabase...
+                  </div>
+                ) : funcionariosList.length === 0 ? (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 text-center">
+                    No hay funcionarios activos registrados.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {funcionariosList.map((func) => (
+                      <button
+                        key={func.funcionario_id}
+                        type="button"
+                        onClick={() => {
+                          setStaffIdentifier(func.email || func.rut);
+                          setStaffPassword(func.password || '');
+                          setErrorMessage(null);
+                        }}
+                        className="w-full text-left p-3 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 border border-sky-200/80 transition-colors cursor-pointer"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">
+                              {func.nombre_completo}
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              {func.rol} • {func.email}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="inline-block px-2.5 py-1 rounded-lg bg-white border border-sky-200 text-xs font-bold text-sky-800">
+                              Clave: {func.password || '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </form>
         )}
       </div>
