@@ -54,7 +54,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [loadingFuncionarios, setLoadingFuncionarios] = useState(false);
 
   useEffect(() => {
-    if (loginRole !== 'funcionario') return;
+    if (loginRole !== 'funcionario' && loginRole !== 'administrativo') return;
     let active = true;
     const loadStaffList = async () => {
       setLoadingFuncionarios(true);
@@ -488,60 +488,76 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               </button>
             </div>
 
-            {loginRole === 'funcionario' && (
-              <div className="mt-5 pt-4 border-t border-slate-200">
-                <div className="flex items-center justify-between mb-2.5">
-                  <p className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                    <KeyRound className="w-3.5 h-3.5 text-sky-600" />
-                    <span>Funcionarios y claves de acceso</span>
-                  </p>
-                  <span className="text-[11px] font-semibold text-sky-700">
-                    Toque para autocompletar
-                  </span>
-                </div>
+            {(loginRole === 'funcionario' || loginRole === 'administrativo') && (() => {
+              const displayedAccounts =
+                loginRole === 'administrativo'
+                  ? funcionariosList.filter((f) => f.rol === 'Administrativo')
+                  : funcionariosList;
 
-                {loadingFuncionarios ? (
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 text-center">
-                    Cargando funcionarios desde Supabase...
+              return (
+                <div className="mt-5 pt-4 border-t border-slate-200">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-sky-600" />
+                      <span>
+                        {loginRole === 'administrativo'
+                          ? 'Administradores y claves de acceso'
+                          : 'Funcionarios y claves de acceso'}
+                      </span>
+                    </p>
+                    <span className="text-[11px] font-semibold text-sky-700">
+                      Toque para autocompletar
+                    </span>
                   </div>
-                ) : funcionariosList.length === 0 ? (
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 text-center">
-                    No hay funcionarios activos registrados.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {funcionariosList.map((func) => (
-                      <button
-                        key={func.funcionario_id}
-                        type="button"
-                        onClick={() => {
-                          setStaffIdentifier(func.email || func.rut);
-                          setStaffPassword(func.password || '');
-                          setErrorMessage(null);
-                        }}
-                        className="w-full text-left p-3 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 border border-sky-200/80 transition-colors cursor-pointer"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <p className="text-sm font-bold text-slate-900">
-                              {func.nombre_completo}
-                            </p>
-                            <p className="text-xs text-slate-600">
-                              {func.rol} • {func.email}
-                            </p>
+
+                  {loadingFuncionarios ? (
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 text-center">
+                      Cargando credenciales desde Supabase...
+                    </div>
+                  ) : displayedAccounts.length === 0 ? (
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 text-center">
+                      {loginRole === 'administrativo'
+                        ? 'No hay usuarios administrativos activos registrados.'
+                        : 'No hay funcionarios activos registrados.'}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {displayedAccounts.map((func) => (
+                        <button
+                          key={func.funcionario_id}
+                          type="button"
+                          onClick={() => {
+                            setStaffIdentifier(func.email || func.rut);
+                            setStaffPassword(func.password || '');
+                            setErrorMessage(null);
+                          }}
+                          className="w-full text-left p-3 rounded-xl bg-sky-50/70 hover:bg-sky-100/80 border border-sky-200/80 transition-colors cursor-pointer"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">
+                                {func.nombre_completo}
+                              </p>
+                              <p className="text-xs text-slate-600">
+                                {func.rol} • RUT: {func.rut}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {func.email}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="inline-block px-2.5 py-1 rounded-lg bg-white border border-sky-200 text-xs font-bold text-sky-800">
+                                Clave: {func.password || '—'}
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <span className="inline-block px-2.5 py-1 rounded-lg bg-white border border-sky-200 text-xs font-bold text-sky-800">
-                              Clave: {func.password || '—'}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </form>
         )}
       </div>
